@@ -2,6 +2,12 @@
 
 End-to-end embedded control system for a CNC press brake back-gauge, built as a real hardware project and portfolio showcase.
 
+![Test bench overview](docs/images/bench_overview.jpg)
+
+| HMI Settings Screen | Step Servo Drive Wiring |
+|---|---|
+| ![HMI Settings](docs/images/hmi_settings.jpg) | ![Servo Drive](docs/images/servo_drive_wiring.jpg) |
+
 ## 1. Project Purpose
 
 This project upgrades a press brake back-gauge workflow from basic manual control to a structured digital system with:
