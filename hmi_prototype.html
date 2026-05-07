@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=800, initial-scale=1.0">
+<title>Back Gauge HMI — Prototip</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#0f1117;--bg2:#1a1d27;--bg3:#252936;--bg4:#2f3447;
+  --blue:#2563eb;--blue2:#1d4ed8;
+  --green:#16a34a;--red:#dc2626;--yellow:#ca8a04;
+  --text:#f1f5f9;--text2:#94a3b8;--border:#334155;--radius:8px;
+}
+html,body{width:800px;height:480px;overflow:hidden;background:#111;color:var(--text);
+  font-family:'Segoe UI',Arial,sans-serif;font-size:14px;user-select:none;}
+#app{width:800px;height:480px;display:flex;flex-direction:column;background:var(--bg);}
+
+/* ── Top bar ── */
+#topbar{height:36px;background:var(--bg2);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 12px;gap:10px;flex-shrink:0;}
+#topbar .logo{font-weight:800;font-size:12px;color:var(--blue);letter-spacing:1.5px;}
+#tb-pos{font-size:14px;font-weight:700;}
+.badge{padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.5px;}
+.b-ready{background:#16a34a22;color:#4ade80;border:1px solid #16a34a;}
+.b-moving{background:#2563eb22;color:#60a5fa;border:1px solid #2563eb;}
+.b-homing{background:#d9770022;color:#fb923c;border:1px solid #d97706;}
+.b-error{background:#dc262622;color:#f87171;border:1px solid #dc2626;}
+.b-none{background:#71717a22;color:#a1a1aa;border:1px solid #71717a;}
+#topbar .spc{flex:1;}
+#tb-mat{font-size:11px;color:var(--text2);}
+#tb-time{font-size:12px;color:var(--text2);}
+
+/* ── Screens ── */
+#screens{flex:1;overflow:hidden;position:relative;}
+.screen{position:absolute;inset:0;padding:10px;display:none;overflow-y:auto;}
+.screen.active{display:flex;flex-direction:column;gap:8px;}
+
+/* ── Navbar ── */
+#navbar{height:52px;background:var(--bg2);border-top:1px solid var(--border);
+  display:flex;flex-shrink:0;}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:2px;cursor:pointer;font-size:10px;color:var(--text2);transition:background .15s;
+  border:none;background:transparent;border-top:2px solid transparent;}
+.nav-btn:hover{background:var(--bg3);}
+.nav-btn.active{color:var(--blue);border-top-color:var(--blue);}
+.nav-btn svg{width:20px;height:20px;}
+
+/* ── Shared ── */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:10px;}
+.ct{font-size:10px;font-weight:700;color:var(--text2);letter-spacing:.5px;
+  text-transform:uppercase;margin-bottom:6px;}
+.btn{border:none;border-radius:var(--radius);cursor:pointer;font-weight:700;
+  font-size:13px;transition:filter .1s;display:flex;align-items:center;
+  justify-content:center;gap:5px;}
+.btn:hover{filter:brightness(1.15);}
+.btn:active{filter:brightness(.9);}
+.b-blue{background:var(--blue);color:#fff;}
+.b-green{background:var(--green);color:#fff;}
+.b-red{background:var(--red);color:#fff;}
+.b-gray{background:var(--bg4);color:var(--text);border:1px solid var(--border);}
+.b-outline{background:transparent;color:var(--blue);border:1px solid var(--blue);}
+.toggle{width:44px;height:24px;border-radius:12px;background:var(--bg3);
+  border:2px solid var(--border);cursor:pointer;position:relative;transition:background .2s;flex-shrink:0;}
+.toggle.on{background:var(--green);border-color:var(--green);}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;
+  border-radius:50%;background:#fff;transition:left .2s;}
+.toggle.on::after{left:22px;}
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+
+/* ════════════════════ HOME ════════════════════ */
+#screen-home{flex-direction:row !important;}
+.hl{width:210px;flex-shrink:0;display:flex;flex-direction:column;gap:7px;}
+.hr{flex:1;display:flex;flex-direction:column;gap:7px;}
+.pos-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);
+  padding:12px 10px;text-align:center;}
+.pos-big{font-size:52px;font-weight:900;color:#fff;line-height:1;letter-spacing:-2px;}
+.pos-unit{font-size:18px;color:var(--text2);}
+.pos-tgt{font-size:11px;color:var(--text2);margin-top:3px;}
+.pos-comp{font-size:11px;color:#fb923c;}
+.adj-row{display:flex;gap:5px;}
+.adj-btn{flex:1;height:36px;background:var(--bg3);border:1px solid var(--border);
+  border-radius:6px;color:var(--text);cursor:pointer;font-weight:700;font-size:12px;}
+.adj-btn:hover{background:var(--bg4);}
+.adj-btn.pos{background:#1e3a5f;border-color:var(--blue);color:#60a5fa;}
+.tgt-row{display:flex;gap:6px;align-items:center;}
+.tgt-row label{font-size:11px;color:var(--text2);white-space:nowrap;}
+.tgt-inp{flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:6px;
+  padding:5px 8px;color:var(--text);font-size:15px;font-weight:700;text-align:right;
+  outline:none;cursor:pointer;}
+.tgt-inp:focus{border-color:var(--blue);}
+.act-row{display:flex;gap:6px;}
+.act-row .btn{flex:1;height:44px;font-size:14px;}
+.irow{display:flex;gap:6px;align-items:center;padding:6px 10px;
+  background:var(--bg2);border:1px solid var(--border);border-radius:6px;}
+.iitem{display:flex;flex-direction:column;flex:1;}
+.ilbl{font-size:10px;color:var(--text2);text-transform:uppercase;}
+.ival{font-size:13px;font-weight:700;}
+.selrow{display:flex;gap:6px;}
+.selbox{flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:6px;
+  padding:6px 10px;cursor:pointer;}
+.selbox:hover{border-color:var(--blue);}
+.sell{font-size:10px;color:var(--text2);}
+.selv{font-size:13px;font-weight:700;color:#60a5fa;}
+
+/* ════════════════════ PROGRAMS ════════════════════ */
+.plist{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:5px;}
+.pitem{background:var(--bg2);border:1px solid var(--border);border-radius:6px;
+  padding:9px 12px;display:flex;align-items:center;gap:10px;cursor:pointer;}
+.pitem:hover{border-color:var(--blue);}
+.pitem.actprog{border-color:var(--green);background:#0d2018;}
+.pnum{font-size:11px;color:var(--text2);width:18px;}
+.pname{font-weight:700;flex:1;}
+.psteps{font-size:11px;color:var(--text2);}
+.pbtns{display:flex;gap:5px;}
+/* Edit steps */
+.slist{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:4px;}
+.sitem{display:flex;align-items:center;gap:8px;background:var(--bg2);
+  border:1px solid var(--border);border-radius:6px;padding:8px 12px;}
+
+/* ════════════════════ MANUAL ════════════════════ */
+#screen-manual{flex-direction:row !important;}
+.ml{flex:1;display:flex;flex-direction:column;gap:8px;}
+.mr{width:175px;display:flex;flex-direction:column;gap:7px;}
+.jgrow{display:flex;gap:10px;align-items:center;}
+.jgbtn{width:78px;height:78px;border-radius:10px;font-size:26px;font-weight:900;}
+.jgmid{flex:1;text-align:center;}
+.jgpos{font-size:38px;font-weight:900;}
+.stepsel{display:flex;gap:5px;}
+.stepbtn{flex:1;height:34px;background:var(--bg3);border:1px solid var(--border);
+  border-radius:6px;color:var(--text);cursor:pointer;font-weight:700;font-size:12px;}
+.stepbtn:hover{background:var(--bg4);}
+.stepbtn.active{background:var(--blue);border-color:var(--blue);color:#fff;}
+
+/* ════════════════════ COUNTER ════════════════════ */
+#screen-counter{flex-direction:row !important;}
+.cbig{font-size:76px;font-weight:900;color:#facc15;text-align:center;line-height:1;}
+.crem{font-size:44px;font-weight:800;color:#4ade80;text-align:center;}
+
+/* ════════════════════ SETTINGS ════════════════════ */
+.srow{display:flex;align-items:center;padding:9px 12px;background:var(--bg2);
+  border:1px solid var(--border);border-radius:6px;gap:10px;cursor:pointer;}
+.srow:hover{border-color:var(--blue);}
+.sname{flex:1;font-weight:500;}
+.sval{font-weight:700;color:#60a5fa;font-size:15px;}
+.sunit{color:var(--text2);font-size:11px;width:48px;text-align:right;}
+
+/* ════════════════════ MATERIALS ════════════════════ */
+.mitem{padding:9px 10px;background:var(--bg2);border:1px solid var(--border);
+  border-radius:6px;cursor:pointer;font-weight:600;margin-bottom:5px;}
+.mitem:hover{border-color:var(--blue);}
+.mitem.active{border-color:var(--green);background:#0d2018;color:#4ade80;}
+.ctable{border-collapse:collapse;width:100%;}
+.ctable th{font-size:10px;color:var(--text2);text-align:left;padding:5px 8px;
+  text-transform:uppercase;}
+.ctable td{padding:7px 8px;border-bottom:1px solid var(--border);}
+
+/* ════════════════════ DIAG ════════════════════ */
+.dgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.ditem{display:flex;align-items:center;gap:8px;padding:8px 12px;
+  background:var(--bg2);border:1px solid var(--border);border-radius:6px;}
+.ddot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.dok{background:#4ade80;box-shadow:0 0 6px #4ade80;}
+.derr{background:#f87171;box-shadow:0 0 6px #f87171;}
+.dwarn{background:#facc15;box-shadow:0 0 4px #facc15;}
+.dname{flex:1;font-size:12px;}
+.dstat{font-size:12px;font-weight:700;}
+
+/* ════════════════════ INFO ════════════════════ */
+.itable{width:100%;border-collapse:collapse;}
+.itable td{padding:7px 12px;border-bottom:1px solid var(--border);}
+.itable td:first-child{color:var(--text2);font-size:12px;}
+.itable td:last-child{font-weight:700;text-align:right;}
+
+/* ════════════════════ OVERLAYS ════════════════════ */
+.ovl{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.78);
+  display:none;align-items:center;justify-content:center;}
+.ovl.active{display:flex;}
+.ovlcard{background:var(--bg2);border:1px solid var(--border);border-radius:12px;
+  padding:22px;width:400px;text-align:center;}
+.ovltitle{font-size:17px;font-weight:700;margin-bottom:6px;}
+.ovlsub{font-size:12px;color:var(--text2);margin-bottom:16px;}
+.ovlpos{font-size:30px;font-weight:800;color:#60a5fa;margin-bottom:18px;}
+.ovlbtns{display:flex;gap:10px;}
+.ovlbtns .btn{flex:1;height:46px;font-size:15px;}
+/* Homing */
+.hbar-bg{width:100%;height:18px;background:var(--bg3);border-radius:9px;
+  overflow:hidden;margin:14px 0;}
+.hbar-fill{height:100%;background:var(--blue);border-radius:9px;transition:width .2s;}
+
+/* ════════════════════ NUMPAD ════════════════════ */
+#numpad-ovl{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.88);
+  display:none;align-items:center;justify-content:center;}
+#numpad-ovl.active{display:flex;}
+.npcard{background:var(--bg2);border:1px solid var(--border);border-radius:12px;
+  padding:18px;width:276px;}
+.nptitle{font-size:12px;color:var(--text2);margin-bottom:7px;text-align:center;}
+.npdisplay{background:var(--bg);border:1px solid var(--border);border-radius:6px;
+  padding:9px 12px;text-align:right;font-size:26px;font-weight:800;
+  color:var(--text);margin-bottom:10px;min-height:50px;}
+.npgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;}
+.npkey{height:46px;background:var(--bg3);border:1px solid var(--border);
+  border-radius:6px;font-size:17px;font-weight:700;color:var(--text);cursor:pointer;}
+.npkey:hover{background:var(--bg4);}
+.npkey.ok{background:var(--green);color:#fff;}
+.npkey.no{background:var(--bg4);color:var(--text2);}
+.npkey.del{background:#7c2d2d;color:#fca5a5;}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ═══ TOP BAR ═══ -->
+<div id="topbar">
+  <span class="logo">CNC BACK GAUGE</span>
+  <span id="tb-pos" style="font-size:14px;font-weight:700">0.00 mm</span>
+  <span id="tb-badge" class="badge b-none">NOT HOMED</span>
+  <span id="tb-mat" class="mat-info"></span>
+  <span class="spc"></span>
+  <span id="tb-time">00:00</span>
+</div>
+
+<!-- ═══ SCREENS ═══ -->
+<div id="screens">
+
+<!-- ─── HOME ─── -->
+<div id="screen-home" class="screen active">
+  <div class="hl">
+    <div class="pos-card">
+      <div><span id="pos-big" class="pos-big">0.00</span><span class="pos-unit"> mm</span></div>
+      <div id="pos-tgt" class="pos-tgt">TARGET: —</div>
+      <div id="pos-comp" class="pos-comp" style="display:none"></div>
+    </div>
+    <div class="adj-row">
+      <button class="adj-btn" onclick="adjTgt(-10)">-10</button>
+      <button class="adj-btn" onclick="adjTgt(-1)">-1</button>
+      <button class="adj-btn" onclick="adjTgt(-0.1)">-0.1</button>
+    </div>
+    <div class="adj-row">
+      <button class="adj-btn pos" onclick="adjTgt(0.1)">+0.1</button>
+      <button class="adj-btn pos" onclick="adjTgt(1)">+1</button>
+      <button class="adj-btn pos" onclick="adjTgt(10)">+10</button>
+    </div>
+    <div class="tgt-row">
+      <label>Cilj →</label>
+      <input id="tgt-inp" class="tgt-inp" type="text" readonly value="0.0"
+        onclick="openNumpad('target','Ciljna pozicija (mm)',S.gotoTarget,0,400,0.1)">
+      <span style="font-size:11px;color:var(--text2)">mm</span>
+    </div>
+    <div class="act-row">
+      <button class="btn b-green" onclick="cmdGo()">▶ GO</button>
+      <button class="btn b-blue" onclick="cmdHome()">⌂ HOME</button>
+    </div>
+    <button class="btn b-red" style="height:40px;width:100%" onclick="cmdStop()">■ STOP</button>
+  </div>
+  <div class="hr">
+    <div class="selrow">
+      <div class="selbox" onclick="showScreen('screen-materials')">
+        <div class="sell">MATERIJAL</div>
+        <div id="sel-mat" class="selv">Čelik S235</div>
+      </div>
+      <div class="selbox" onclick="openNumpad('thickness','Debljina lima (mm)',S.thickness,0.5,20,0.5)">
+        <div class="sell">DEBLJINA</div>
+        <div id="sel-thick" class="selv">2.0 mm</div>
+      </div>
+      <div class="selbox" onclick="showScreen('screen-counter')">
+        <div class="sell">KOMADA</div>
+        <div id="sel-count" class="selv">0</div>
+      </div>
+    </div>
+    <div class="irow">
+      <div class="iitem"><span class="ilbl">STATUS</span><span id="ival-status" class="ival">NOT HOMED</span></div>
+      <div class="iitem"><span class="ilbl">PROGRAM</span><span id="ival-prog" class="ival">—</span></div>
+      <div class="iitem"><span class="ilbl">KORAK</span><span id="ival-step" class="ival">—</span></div>
+    </div>
+    <div class="card" style="flex:1;overflow:hidden">
+      <div class="ct">Aktivni koraci programa</div>
+      <div id="prog-preview" style="display:flex;flex-direction:column;gap:3px;overflow-y:auto;max-height:140px"></div>
+      <div id="prog-empty" style="color:var(--text2);font-size:12px;text-align:center;padding:18px">
+        Nema aktivnog programa
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── PROGRAMS ─── -->
+<div id="screen-programs" class="screen">
+  <div style="display:flex;gap:7px;align-items:center">
+    <span style="font-weight:700;font-size:15px">PROGRAMI</span>
+    <span class="spc"></span>
+    <button class="btn b-outline" style="height:32px;padding:0 12px;font-size:12px" onclick="saveCurrent()">SAČUVAJ POZICIJU</button>
+    <button class="btn b-green" style="height:32px;padding:0 12px;font-size:12px" onclick="newProgram()">+ NOVI</button>
+  </div>
+  <div id="prog-list" class="plist"></div>
+</div>
+
+<!-- ─── EDIT PROGRAM ─── -->
+<div id="screen-edit" class="screen">
+  <div style="display:flex;gap:7px;align-items:center">
+    <button class="btn b-gray" style="height:32px;padding:0 10px" onclick="showScreen('screen-programs')">← NAZAD</button>
+    <input id="ep-name" style="flex:1;background:var(--bg3);border:1px solid var(--border);
+      border-radius:6px;padding:5px 10px;color:var(--text);font-size:14px;font-weight:700;outline:none"
+      oninput="S.editProg&&(S.editProg.name=this.value,saveLS())" placeholder="Naziv programa">
+    <button class="btn b-green" style="height:32px;padding:0 12px;font-size:12px" onclick="addStep()">+ KORAK</button>
+  </div>
+  <div id="step-list" class="slist"></div>
+</div>
+
+<!-- ─── MANUAL ─── -->
+<div id="screen-manual" class="screen">
+  <div class="ml">
+    <div style="font-weight:700;font-size:15px">RUČNO UPRAVLJANJE</div>
+    <div class="card" style="text-align:center;padding:16px">
+      <div style="font-size:11px;color:var(--text2);margin-bottom:4px">POZICIJA</div>
+      <span id="jog-pos" class="jgpos">0.00</span>
+      <span style="font-size:16px;color:var(--text2)"> mm</span>
+    </div>
+    <div class="jgrow">
+      <button class="btn b-blue jgbtn" onmousedown="startJog(-1)" onmouseup="stopJog()"
+        ontouchstart="startJog(-1)" ontouchend="stopJog()">◀◀</button>
+      <div class="jgmid">
+        <div style="font-size:10px;color:var(--text2)">JOG KORAK</div>
+        <div id="jog-step-lbl" style="font-size:20px;font-weight:800;color:#60a5fa">1.00 mm</div>
+      </div>
+      <button class="btn b-blue jgbtn" onmousedown="startJog(1)" onmouseup="stopJog()"
+        ontouchstart="startJog(1)" ontouchend="stopJog()">▶▶</button>
+    </div>
+    <div class="stepsel">
+      <button class="stepbtn" onclick="setJogStep(10)">10 mm</button>
+      <button class="stepbtn active" onclick="setJogStep(1)">1 mm</button>
+      <button class="stepbtn" onclick="setJogStep(0.1)">0.1 mm</button>
+      <button class="stepbtn" onclick="setJogStep(0.01)">0.01 mm</button>
+    </div>
+  </div>
+  <div class="mr">
+    <div style="font-weight:700;font-size:13px;color:var(--text2)">AKCIJE</div>
+    <div class="card">
+      <div class="ct">IDI NA POZICIJU</div>
+      <div id="goto-display" style="font-size:22px;font-weight:800;color:#60a5fa;
+        margin-bottom:7px;text-align:right;cursor:pointer"
+        onclick="openNumpad('goto','Pozicija (mm)',S.gotoTarget,0,400,0.01)">
+        100.00 mm
+      </div>
+      <button class="btn b-green" style="width:100%;height:38px" onclick="cmdGoTo()">IDI ▶</button>
+    </div>
+    <button class="btn b-blue" style="height:42px" onclick="cmdHome()">⌂ HOMING</button>
+    <button class="btn b-outline" style="height:36px" onclick="showOvl('ovl-zero')">⊙ SET ZERO</button>
+    <button class="btn b-red" style="height:36px" onclick="cmdStop()">■ STOP</button>
+  </div>
+</div>
+
+<!-- ─── COUNTER ─── -->
+<div id="screen-counter" class="screen">
+  <div style="font-weight:700;font-size:15px">BROJAČ KOMADA</div>
+  <div style="display:flex;gap:8px;flex:1">
+    <div class="card" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">
+      <div style="font-size:11px;color:var(--text2);text-transform:uppercase">Ukupno komada</div>
+      <div id="cnt-big" class="cbig">0</div>
+      <button class="btn b-gray" style="height:34px;padding:0 20px" onclick="resetCount()">RESET</button>
+    </div>
+    <div style="width:215px;display:flex;flex-direction:column;gap:7px">
+      <div class="card">
+        <div class="ct">SERIJA (BATCH)</div>
+        <div id="batch-disp" style="font-size:30px;font-weight:800;text-align:center;
+          cursor:pointer;color:#60a5fa"
+          onclick="openNumpad('batch','Veličina serije',S.batchSet,1,9999,1)">500</div>
+        <div style="display:flex;gap:5px;margin-top:6px">
+          <button class="btn b-gray" style="flex:1;height:34px;font-size:20px" onclick="adjBatch(-1)">−</button>
+          <button class="btn b-blue" style="flex:1;height:34px;font-size:20px" onclick="adjBatch(1)">+</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ct">PREOSTALO</div>
+        <div id="cnt-rem" class="crem">500</div>
+      </div>
+      <div class="card" style="display:flex;align-items:center;gap:8px">
+        <div style="flex:1">
+          <div style="font-size:11px;color:var(--text2)">AUTO BROJANJE</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:1px">Broji automatski</div>
+        </div>
+        <div id="autoinc-toggle" class="toggle on" onclick="toggleAutoInc()"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── SETTINGS ─── -->
+<div id="screen-settings" class="screen">
+  <div style="font-weight:700;font-size:15px">PODEŠAVANJA</div>
+  <div id="settings-list" style="display:flex;flex-direction:column;gap:4px;overflow-y:auto;flex:1"></div>
+</div>
+
+<!-- ─── MATERIALS ─── -->
+<div id="screen-materials" class="screen">
+  <div style="display:flex;gap:7px;align-items:center">
+    <button class="btn b-gray" style="height:32px;padding:0 10px" onclick="showScreen('screen-home')">← NAZAD</button>
+    <span style="font-weight:700;font-size:15px">MATERIJALI I KOMPENZACIJA</span>
+  </div>
+  <div style="display:flex;gap:8px;flex:1;overflow:hidden">
+    <div style="width:165px;display:flex;flex-direction:column;overflow-y:auto">
+      <div id="mat-list"></div>
+      <button class="btn b-outline" style="height:32px;font-size:12px;margin-top:4px" onclick="addMat()">+ NOVI</button>
+    </div>
+    <div class="card" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+      <div class="ct" id="comp-title">Kompenzacija</div>
+      <div style="overflow-y:auto;flex:1">
+        <table class="ctable">
+          <thead><tr>
+            <th>Debljina</th><th>Kompenzacija</th><th>Primjer (100mm →)</th><th></th>
+          </tr></thead>
+          <tbody id="comp-body"></tbody>
+        </table>
+      </div>
+      <button class="btn b-outline" style="height:30px;font-size:12px;margin-top:6px" onclick="addCompRow()">+ DODAJ DEBLJINU</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── DIAGNOSTICS ─── -->
+<div id="screen-diag" class="screen">
+  <div style="font-weight:700;font-size:15px">DIJAGNOSTIKA</div>
+  <div style="display:flex;gap:8px;flex:1">
+    <div class="dgrid" style="flex:1;align-content:start">
+      <div class="ditem"><div class="ddot dok"></div><span class="dname">Motor Driver</span><span class="dstat" style="color:#4ade80">OK</span></div>
+      <div class="ditem"><div id="dg-home" class="ddot dwarn"></div><span class="dname">Home Switch</span><span id="dg-home-t" class="dstat" style="color:#facc15">—</span></div>
+      <div class="ditem"><div class="ddot dok"></div><span class="dname">Napajanje 24V</span><span class="dstat" style="color:#4ade80">OK</span></div>
+      <div class="ditem"><div id="dg-press" class="ddot dwarn"></div><span class="dname">Senzor pritiska</span><span id="dg-press-t" class="dstat" style="color:#facc15">—</span></div>
+      <div class="ditem"><div class="ddot dok"></div><span class="dname">Emergency Stop</span><span class="dstat" style="color:#4ade80">OK</span></div>
+      <div class="ditem"><div class="ddot dok"></div><span class="dname">Encoder</span><span class="dstat" style="color:#4ade80">OK</span></div>
+      <div class="ditem"><div id="dg-homed" class="ddot derr"></div><span class="dname">Homed</span><span id="dg-homed-t" class="dstat" style="color:#f87171">NE</span></div>
+      <div class="ditem"><div class="ddot dok"></div><span class="dname">NVS Storage</span><span class="dstat" style="color:#4ade80">OK</span></div>
+    </div>
+    <div style="width:190px;display:flex;flex-direction:column;gap:7px">
+      <div class="card"><div class="ct">FIRMWARE</div><div style="font-size:26px;font-weight:800;color:#60a5fa">1.0.0</div></div>
+      <div class="card"><div class="ct">BOARD TEMP</div><div style="font-size:26px;font-weight:800;color:#facc15">42°C</div></div>
+      <div class="card"><div class="ct">UPTIME</div><div id="dg-uptime" style="font-size:18px;font-weight:800">00:00:00</div></div>
+      <button class="btn b-gray" style="height:34px;font-size:12px" onclick="showScreen('screen-info')">ℹ INFORMACIJE →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── INFO ─── -->
+<div id="screen-info" class="screen">
+  <div style="display:flex;gap:7px;align-items:center">
+    <button class="btn b-gray" style="height:32px;padding:0 10px" onclick="showScreen('screen-diag')">← NAZAD</button>
+    <span style="font-weight:700;font-size:15px;color:var(--blue)">BACK GAUGE CONTROL</span>
+  </div>
+  <div style="display:flex;gap:8px;flex:1">
+    <div class="card" style="flex:1">
+      <div class="ct">Sistem</div>
+      <table class="itable">
+        <tr><td>Verzija softvera</td><td>1.0.0</td></tr>
+        <tr><td>Hardware</td><td>ESP32-S3 + Waveshare 7"</td></tr>
+        <tr><td>Motor driver</td><td>ZDM-2HA865</td></tr>
+        <tr><td>Motor</td><td>NEMA23 encoder 3Nm</td></tr>
+        <tr><td>Ballscrew</td><td>1605 (5mm/okr)</td></tr>
+      </table>
+    </div>
+    <div class="card" style="flex:1">
+      <div class="ct">Mehanika</div>
+      <table class="itable">
+        <tr><td>Koraci/mm</td><td id="info-spmm">640</td></tr>
+        <tr><td>Korak zavrtnja</td><td>5 mm/okr</td></tr>
+        <tr><td>Mikrostep</td><td>1/16 (3200 k/okr)</td></tr>
+        <tr><td>Maks. hod</td><td id="info-maxpos">400.0 mm</td></tr>
+        <tr><td>Backlash kompenz.</td><td id="info-bl">3.0 mm</td></tr>
+        <tr><td>Datum offset</td><td id="info-datum">0.00 mm</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+</div><!-- /screens -->
+
+<!-- ═══ NAVBAR ═══ -->
+<div id="navbar">
+  <button class="nav-btn active" id="nav-home" onclick="showScreen('screen-home')">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>HOME</button>
+  <button class="nav-btn" id="nav-programs" onclick="showScreen('screen-programs')">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>PROGRAMI</button>
+  <button class="nav-btn" id="nav-manual" onclick="showScreen('screen-manual')">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/></svg>MANUAL</button>
+  <button class="nav-btn" id="nav-counter" onclick="showScreen('screen-counter')">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>COUNTER</button>
+  <button class="nav-btn" id="nav-settings" onclick="showScreen('screen-settings')">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94L14.4 2.81c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41L9.25 5.35c-.59.24-1.13.56-1.62.93l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.63-.07.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>SETTINGS</button>
+  <button class="nav-btn" id="nav-info" onclick="showScreen('screen-diag')">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>INFO</button>
+</div>
+
+</div><!-- /app -->
+
+<!-- ═══ OVERLAY: ZERO ═══ -->
+<div id="ovl-zero" class="ovl">
+  <div class="ovlcard">
+    <div style="font-size:36px;margin-bottom:6px">⊙</div>
+    <div class="ovltitle">Postavi ZERO ovdje</div>
+    <div class="ovlsub">Trenutna pozicija će biti NULA.<br>Jesi li siguran?</div>
+    <div class="ovlpos" id="zero-pos">0.00 mm</div>
+    <div class="ovlbtns">
+      <button class="btn b-green" onclick="confirmZero()">✓ POSTAVI ZERO</button>
+      <button class="btn b-gray" onclick="hideOvl('ovl-zero')">✕ ODUSTANI</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ OVERLAY: HOMING ═══ -->
+<div id="ovl-homing" class="ovl">
+  <div class="ovlcard">
+    <div id="hom-txt" style="color:#fb923c;font-size:14px;font-weight:700;margin-bottom:4px">HOMING U TOKU...</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:2px">Molimo sačekajte</div>
+    <div class="hbar-bg"><div id="hom-bar" class="hbar-fill" style="width:0%"></div></div>
+    <div id="hom-pct" style="font-size:14px;font-weight:700;color:#60a5fa;margin-bottom:14px">0%</div>
+    <button class="btn b-red" style="width:100%;height:42px" onclick="cancelHoming()">■ STOP</button>
+  </div>
+</div>
+
+<!-- ═══ NUMPAD ═══ -->
+<div id="numpad-ovl">
+  <div class="npcard">
+    <div class="nptitle" id="np-title">Unesite vrijednost</div>
+    <div class="npdisplay" id="np-display">0</div>
+    <div class="npgrid">
+      <button class="npkey" onclick="npk('7')">7</button>
+      <button class="npkey" onclick="npk('8')">8</button>
+      <button class="npkey" onclick="npk('9')">9</button>
+      <button class="npkey" onclick="npk('4')">4</button>
+      <button class="npkey" onclick="npk('5')">5</button>
+      <button class="npkey" onclick="npk('6')">6</button>
+      <button class="npkey" onclick="npk('1')">1</button>
+      <button class="npkey" onclick="npk('2')">2</button>
+      <button class="npkey" onclick="npk('3')">3</button>
+      <button class="npkey" onclick="npk('.')">.</button>
+      <button class="npkey" onclick="npk('0')">0</button>
+      <button class="npkey del" onclick="npbs()">⌫</button>
+      <button class="npkey no" onclick="npcancel()">✕</button>
+      <button class="npkey" onclick="npk('-')">±</button>
+      <button class="npkey ok" onclick="npconfirm()">✓</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════
+const S = {
+  position:    0.0,
+  target:      0.0,
+  gotoTarget:  100.0,
+  status:      'NOT_HOMED',
+  isHomed:     false,
+  isMoving:    false,
+  count:       0,
+  batchSet:    500,
+  autoInc:     true,
+  matIdx:      0,
+  thickness:   2.0,
+  currentProg: null,
+  currentStep: 0,
+  editProg:    null,
+  jogStep:     1.0,
+  homingTimer: null,
+  homingPct:   0,
+  uptime:      0,
+  settings: {
+    maxSpeed:    40,
+    acceleration:150,
+    deceleration:150,
+    backlash:    3.0,
+    softLimit:   400.0,
+    retractDist: 50.0,
+    datumOffset: 0.0,
+    brightness:  80,
+  },
+  materials: [
+    { name:'Čelik S235', comps:[{t:1.0,c:0.05},{t:1.5,c:0.07},{t:2.0,c:0.08},{t:3.0,c:0.12},{t:5.0,c:0.18}] },
+    { name:'Inox 304',   comps:[{t:1.0,c:0.08},{t:1.5,c:0.11},{t:2.0,c:0.13},{t:3.0,c:0.20},{t:5.0,c:0.30}] },
+    { name:'Aluminij',   comps:[{t:1.0,c:-0.03},{t:1.5,c:-0.04},{t:2.0,c:-0.05},{t:3.0,c:-0.08},{t:5.0,c:-0.12}] },
+  ],
+  programs: [],
+};
+
+// ── LocalStorage ──
+function saveLS() {
+  localStorage.setItem('bg_progs', JSON.stringify(S.programs));
+  localStorage.setItem('bg_set',   JSON.stringify(S.settings));
+  localStorage.setItem('bg_mats',  JSON.stringify(S.materials));
+}
+try {
+  const p = localStorage.getItem('bg_progs'); if(p) S.programs = JSON.parse(p);
+  const s = localStorage.getItem('bg_set');   if(s) Object.assign(S.settings, JSON.parse(s));
+  const m = localStorage.getItem('bg_mats');  if(m) S.materials = JSON.parse(m);
+} catch(e){}
+
+// ═══════════════════════════════════════════════════════════
+//  MOTOR SIMULATION
+// ═══════════════════════════════════════════════════════════
+function getComp() {
+  const mat = S.materials[S.matIdx];
+  if (!mat || !mat.comps.length) return 0;
+  const sorted = [...mat.comps].sort((a,b)=>a.t-b.t);
+  for (let i=0; i<sorted.length-1; i++) {
+    if (S.thickness >= sorted[i].t && S.thickness <= sorted[i+1].t) {
+      const f = (S.thickness-sorted[i].t)/(sorted[i+1].t-sorted[i].t);
+      return sorted[i].c + f*(sorted[i+1].c-sorted[i].c);
+    }
+  }
+  // extrapolate closest
+  let best=sorted[0], bd=Infinity;
+  for (const c of sorted) { const d=Math.abs(c.t-S.thickness); if(d<bd){bd=d;best=c;} }
+  return best.c;
+}
+
+setInterval(() => {
+  if (!S.isMoving) return;
+  const diff = S.target - S.position;
+  const spd  = S.settings.maxSpeed * 0.05;
+  if (Math.abs(diff) < 0.02) {
+    S.position = S.target;
+    S.isMoving = false;
+    setStatus(S.isHomed ? 'READY' : 'NOT_HOMED');
+    if (S.autoInc && S.status !== 'HOMING') { S.count++; updateCountUI(); }
+  } else {
+    S.position += Math.sign(diff) * Math.min(spd, Math.abs(diff));
+  }
+  updatePosUI();
+}, 50);
+
+function moveTo(mm) {
+  const v = Math.max(0, Math.min(S.settings.softLimit, mm));
+  S.target = v; S.isMoving = true; setStatus('MOVING');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  COMMANDS
+// ═══════════════════════════════════════════════════════════
+function cmdGo() {
+  if (!S.isHomed) { alert('Uradi homing prvo!'); return; }
+  const comp = getComp();
+  const real = S.gotoTarget + S.settings.datumOffset + comp;
+  const ce = document.getElementById('pos-comp');
+  if (comp !== 0) {
+    ce.style.display='';
+    ce.textContent = 'Komp: '+(comp>=0?'+':'')+comp.toFixed(3)+'mm → '+real.toFixed(3)+'mm';
+  } else { ce.style.display='none'; }
+  moveTo(real);
+}
+function cmdGoTo() { if(!S.isHomed){alert('Uradi homing prvo!');return;} moveTo(S.gotoTarget); }
+function cmdStop() {
+  S.isMoving=false; S.target=S.position;
+  if (S.homingTimer) { clearInterval(S.homingTimer); S.homingTimer=null; hideOvl('ovl-homing'); }
+  setStatus(S.isHomed?'READY':'NOT_HOMED');
+}
+function cmdHome() {
+  showOvl('ovl-homing');
+  S.homingPct=0; S.isHomed=false; setStatus('HOMING');
+  document.getElementById('hom-txt').textContent='HOMING U TOKU...';
+  document.getElementById('hom-bar').style.background='var(--blue)';
+  S.homingTimer = setInterval(()=>{
+    S.homingPct += 2;
+    document.getElementById('hom-bar').style.width = S.homingPct+'%';
+    document.getElementById('hom-pct').textContent  = S.homingPct+'%';
+    if (S.homingPct >= 100) {
+      clearInterval(S.homingTimer); S.homingTimer=null;
+      S.position=0; S.target=0; S.isHomed=true; setStatus('READY');
+      document.getElementById('hom-txt').textContent='✓ HOMING ZAVRŠEN';
+      document.getElementById('hom-bar').style.background='var(--green)';
+      const dh=document.getElementById('dg-homed'), dt=document.getElementById('dg-homed-t');
+      dh.className='ddot dok'; dt.textContent='DA'; dt.style.color='#4ade80';
+      updatePosUI();
+      setTimeout(()=>hideOvl('ovl-homing'),1200);
+    }
+  },80);
+}
+function cancelHoming() {
+  if(S.homingTimer){clearInterval(S.homingTimer);S.homingTimer=null;}
+  hideOvl('ovl-homing'); setStatus('NOT_HOMED');
+}
+function adjTgt(d) {
+  S.gotoTarget = Math.max(0, Math.min(S.settings.softLimit, Math.round((S.gotoTarget+d)*10)/10));
+  updateTgtUI();
+}
+function setTargetVal(v) { S.gotoTarget=Math.max(0,Math.min(S.settings.softLimit,v)); updateTgtUI(); }
+function confirmZero() {
+  S.position=0; S.target=0; S.isHomed=true; setStatus('READY');
+  updatePosUI(); hideOvl('ovl-zero');
+}
+
+// ── Jog ──
+function setJogStep(v) {
+  S.jogStep=v;
+  document.getElementById('jog-step-lbl').textContent=v+' mm';
+  document.querySelectorAll('.stepbtn').forEach(b=>{
+    b.classList.toggle('active', b.textContent.trim().startsWith(String(v)));
+  });
+}
+function startJog(dir) {
+  if(!S.isHomed) return;
+  moveTo(S.position + dir*S.jogStep);
+}
+function stopJog(){}
+
+// ── Counter ──
+function resetCount(){ S.count=0; updateCountUI(); }
+function adjBatch(d){ S.batchSet=Math.max(1,S.batchSet+d); updateCountUI(); }
+function toggleAutoInc(){
+  S.autoInc=!S.autoInc;
+  document.getElementById('autoinc-toggle').classList.toggle('on',S.autoInc);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  UI UPDATES
+// ═══════════════════════════════════════════════════════════
+function updatePosUI() {
+  const p = S.position.toFixed(2);
+  document.getElementById('pos-big').textContent  = p;
+  document.getElementById('jog-pos').textContent  = p;
+  document.getElementById('tb-pos').textContent   = p+' mm';
+}
+function updateTgtUI() {
+  document.getElementById('tgt-inp').value = S.gotoTarget.toFixed(1);
+  document.getElementById('pos-tgt').textContent = 'TARGET: '+S.gotoTarget.toFixed(1)+' mm';
+  document.getElementById('goto-display').textContent = S.gotoTarget.toFixed(2)+' mm';
+}
+function setStatus(s) {
+  S.status=s;
+  const map = {
+    'NOT_HOMED':['NOT HOMED','b-none'],
+    'READY':    ['READY',    'b-ready'],
+    'MOVING':   ['MOVING',   'b-moving'],
+    'HOMING':   ['HOMING',   'b-homing'],
+    'ERROR':    ['ERROR',    'b-error'],
+  };
+  const [txt,cls] = map[s]||['—','b-none'];
+  const el=document.getElementById('tb-badge');
+  el.textContent=txt; el.className='badge '+cls;
+  document.getElementById('ival-status').textContent=txt;
+}
+function updateMatUI() {
+  const mat=S.materials[S.matIdx];
+  document.getElementById('sel-mat').textContent  = mat?mat.name:'—';
+  document.getElementById('sel-thick').textContent= S.thickness.toFixed(1)+' mm';
+  const c=getComp();
+  document.getElementById('tb-mat').textContent   =
+    (mat?mat.name:'—')+' / '+S.thickness+'mm'+(c?(c>0?' +':' ')+c.toFixed(3)+'mm':'');
+}
+function updateCountUI() {
+  document.getElementById('cnt-big').textContent   = S.count;
+  document.getElementById('sel-count').textContent = S.count;
+  document.getElementById('batch-disp').textContent= S.batchSet;
+  const rem = Math.max(0, S.batchSet-S.count);
+  const re = document.getElementById('cnt-rem');
+  re.textContent=rem; re.style.color=rem<=10?'#f87171':'#4ade80';
+}
+
+// ═══════════════════════════════════════════════════════════
+//  PROGRAMS
+// ═══════════════════════════════════════════════════════════
+function renderPrograms() {
+  const el=document.getElementById('prog-list');
+  if (!S.programs.length) {
+    el.innerHTML='<div style="color:var(--text2);text-align:center;padding:28px">Nema sačuvanih programa</div>';
+    return;
+  }
+  el.innerHTML=S.programs.map((p,i)=>`
+    <div class="pitem ${S.currentProg===p?'actprog':''}">
+      <span class="pnum">${i+1}</span>
+      <span class="pname">${p.name}</span>
+      <span class="psteps">${p.steps.length} kor.</span>
+      <div class="pbtns">
+        <button class="btn b-blue" style="height:28px;padding:0 10px;font-size:11px" onclick="loadProg(${i})">LOAD</button>
+        <button class="btn b-gray" style="height:28px;padding:0 10px;font-size:11px" onclick="editProg(${i})">✏</button>
+        <button class="btn b-red"  style="height:28px;padding:0 8px;font-size:11px"  onclick="delProg(${i})">✕</button>
+      </div>
+    </div>`).join('');
+}
+function newProgram() {
+  const p={name:'Program '+(S.programs.length+1),steps:[]};
+  S.programs.push(p); saveLS(); editProg(S.programs.length-1);
+}
+function saveCurrent() {
+  const p={name:'Pozicija '+S.position.toFixed(1)+'mm',steps:[{pos:S.position,count:1}]};
+  S.programs.push(p); saveLS(); renderPrograms();
+}
+function loadProg(i) {
+  S.currentProg=S.programs[i]; S.currentStep=0;
+  document.getElementById('ival-prog').textContent=S.currentProg.name;
+  renderProgPreview(); renderPrograms(); showScreen('screen-home');
+}
+function delProg(i) {
+  if(!confirm('Obriši "'+S.programs[i].name+'"?')) return;
+  if(S.currentProg===S.programs[i]) S.currentProg=null;
+  S.programs.splice(i,1); saveLS(); renderPrograms();
+}
+function editProg(i) {
+  S.editProg=S.programs[i];
+  document.getElementById('ep-name').value=S.editProg.name;
+  renderEditSteps(); showScreen('screen-edit');
+}
+function addStep() {
+  if(!S.editProg) return;
+  S.editProg.steps.push({pos:S.gotoTarget,count:1}); saveLS(); renderEditSteps();
+}
+function renderEditSteps() {
+  const el=document.getElementById('step-list');
+  if (!S.editProg||!S.editProg.steps.length) {
+    el.innerHTML='<div style="color:var(--text2);text-align:center;padding:20px">Nema koraka. Pritisnite + KORAK.</div>';
+    return;
+  }
+  el.innerHTML=S.editProg.steps.map((s,i)=>`
+    <div class="sitem">
+      <span style="color:var(--text2);font-size:12px;width:20px">${i+1}.</span>
+      <span style="font-weight:700;flex:1;color:#60a5fa;cursor:pointer"
+        onclick="openNumpad('sp${i}','Pozicija koraka ${i+1} (mm)',${s.pos},0,400,0.01)">${s.pos.toFixed(2)} mm</span>
+      <span style="color:var(--text2);font-size:12px">×</span>
+      <span style="font-weight:700;color:#4ade80;cursor:pointer"
+        onclick="openNumpad('sc${i}','Komada u koraku ${i+1}',${s.count},1,9999,1)">${s.count} kom</span>
+      <button class="btn b-red" style="height:26px;padding:0 7px;font-size:11px;margin-left:auto"
+        onclick="delStep(${i})">✕</button>
+    </div>`).join('');
+}
+function delStep(i) { S.editProg.steps.splice(i,1); saveLS(); renderEditSteps(); }
+function renderProgPreview() {
+  const pe=document.getElementById('prog-preview'),ee=document.getElementById('prog-empty');
+  if (!S.currentProg||!S.currentProg.steps.length) { pe.style.display='none';ee.style.display='';return; }
+  pe.style.display='flex'; ee.style.display='none';
+  const si=S.currentStep;
+  pe.innerHTML=S.currentProg.steps.map((s,i)=>`
+    <div style="display:flex;gap:7px;align-items:center;padding:4px 8px;border-radius:5px;
+      background:${i===si?'#1a2f50':'var(--bg3)'};
+      border:1px solid ${i===si?'var(--blue)':'var(--border)'}">
+      <span style="color:var(--text2);font-size:11px;width:18px">${i+1}.</span>
+      <span style="font-weight:700;flex:1">${s.pos.toFixed(2)} mm</span>
+      <span style="color:var(--text2);font-size:11px">${s.count}×</span>
+      ${i===si?'<span style="color:#60a5fa;font-size:10px">◀</span>':''}
+    </div>`).join('');
+  document.getElementById('ival-step').textContent=(si+1)+'/'+S.currentProg.steps.length;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SETTINGS
+// ═══════════════════════════════════════════════════════════
+const SDEFS = [
+  {k:'maxSpeed',    l:'Maksimalna brzina',           u:'mm/s',  min:5,   max:200,  step:5   },
+  {k:'acceleration',l:'Ubrzanje',                    u:'mm/s²', min:20,  max:600,  step:10  },
+  {k:'deceleration',l:'Usporenje',                   u:'mm/s²', min:20,  max:600,  step:10  },
+  {k:'backlash',    l:'Backlash kompenzacija',        u:'mm',    min:0,   max:10,   step:0.1 },
+  {k:'softLimit',   l:'Soft limit (maks. hod)',       u:'mm',    min:50,  max:600,  step:10  },
+  {k:'retractDist', l:'Retract hod',                  u:'mm',    min:5,   max:150,  step:5   },
+  {k:'datumOffset', l:'Datum offset (kalibracija 0)', u:'mm',    min:-100,max:100,  step:0.01},
+  {k:'brightness',  l:'Osvetljenost ekrana',          u:'%',     min:20,  max:100,  step:5   },
+];
+function renderSettings() {
+  document.getElementById('settings-list').innerHTML = SDEFS.map(d=>`
+    <div class="srow" onclick="openSettingNP('${d.k}')">
+      <span class="sname">${d.l}</span>
+      <span class="sval" id="sv-${d.k}">${S.settings[d.k]}</span>
+      <span class="sunit">${d.u}</span>
+      <span style="color:var(--text2)">›</span>
+    </div>`).join('');
+}
+function openSettingNP(k) {
+  const d=SDEFS.find(x=>x.k===k);
+  if(!d) return;
+  openNumpad('SET_'+k, d.l, S.settings[k], d.min, d.max, d.step);
+}
+function updateSettingsUI() {
+  SDEFS.forEach(d=>{ const e=document.getElementById('sv-'+d.k); if(e) e.textContent=S.settings[d.k]; });
+  document.getElementById('info-maxpos').textContent=S.settings.softLimit.toFixed(1)+' mm';
+  document.getElementById('info-bl').textContent=S.settings.backlash.toFixed(1)+' mm';
+  document.getElementById('info-datum').textContent=S.settings.datumOffset.toFixed(2)+' mm';
+}
+
+// ═══════════════════════════════════════════════════════════
+//  MATERIALS
+// ═══════════════════════════════════════════════════════════
+function renderMatList() {
+  document.getElementById('mat-list').innerHTML=S.materials.map((m,i)=>`
+    <div class="mitem ${S.matIdx===i?'active':''}" onclick="selMat(${i})">${m.name}</div>`).join('');
+}
+function selMat(i) { S.matIdx=i; renderMatList(); renderCompTable(); updateMatUI(); }
+function addMat() {
+  const n=prompt('Naziv materijala:'); if(!n) return;
+  S.materials.push({name:n,comps:[{t:1.0,c:0},{t:2.0,c:0},{t:3.0,c:0}]});
+  selMat(S.materials.length-1); saveLS();
+}
+function renderCompTable() {
+  const mat=S.materials[S.matIdx]; if(!mat) return;
+  document.getElementById('comp-title').textContent='Kompenzacija — '+mat.name;
+  document.getElementById('comp-body').innerHTML=mat.comps.map((c,i)=>`
+    <tr>
+      <td style="cursor:pointer;color:#60a5fa;font-weight:700"
+        onclick="openNumpad('CT${i}','Debljina (mm)',${c.t},0.1,30,0.1)">${c.t.toFixed(1)} mm</td>
+      <td style="cursor:pointer;font-weight:700;color:${c.c>=0?'#4ade80':'#f87171'}"
+        onclick="openNumpad('CC${i}','Kompenzacija (mm, može negativno)',${c.c},-10,10,0.001)">
+        ${c.c>=0?'+':''}${c.c.toFixed(3)} mm</td>
+      <td style="color:var(--text2);font-size:12px">${(100+c.c).toFixed(3)} mm</td>
+      <td><button class="btn b-red" style="height:24px;padding:0 7px;font-size:10px"
+        onclick="delComp(${i})">✕</button></td>
+    </tr>`).join('');
+}
+function addCompRow() {
+  const mat=S.materials[S.matIdx]; if(!mat) return;
+  mat.comps.push({t:1.0,c:0}); mat.comps.sort((a,b)=>a.t-b.t);
+  saveLS(); renderCompTable();
+}
+function delComp(i) { S.materials[S.matIdx].comps.splice(i,1); saveLS(); renderCompTable(); }
+
+// ═══════════════════════════════════════════════════════════
+//  NUMPAD
+// ═══════════════════════════════════════════════════════════
+let NP = { field:'', min:0, max:9999, step:1, val:'' };
+function openNumpad(field, title, cur, min, max, step) {
+  NP={field,min,max,step,val:String(cur)};
+  document.getElementById('np-title').textContent=title;
+  document.getElementById('np-display').textContent=cur;
+  document.getElementById('numpad-ovl').classList.add('active');
+}
+function npk(k) {
+  if (k==='-') { NP.val=NP.val.startsWith('-')?NP.val.slice(1):'-'+NP.val; }
+  else if (k==='.' && NP.val.includes('.')) return;
+  else { NP.val=(NP.val==='0'||NP.val==='')?k:NP.val+k; }
+  document.getElementById('np-display').textContent=NP.val;
+}
+function npbs() {
+  NP.val=NP.val.length>1?NP.val.slice(0,-1):'0';
+  document.getElementById('np-display').textContent=NP.val;
+}
+function npcancel() { document.getElementById('numpad-ovl').classList.remove('active'); }
+function npconfirm() {
+  let v=parseFloat(NP.val);
+  if(isNaN(v)){npcancel();return;}
+  v=Math.max(NP.min,Math.min(NP.max,v));
+  v=Math.round(v/NP.step)*NP.step;
+  v=parseFloat(v.toFixed(6));
+  const f=NP.field;
+  if      (f==='target')    { setTargetVal(v); }
+  else if (f==='thickness') { S.thickness=v; updateMatUI(); }
+  else if (f==='goto')      { S.gotoTarget=v; updateTgtUI(); }
+  else if (f==='batch')     { S.batchSet=v; updateCountUI(); }
+  else if (f.startsWith('SET_')) {
+    const k=f.slice(4); S.settings[k]=v; saveLS(); updateSettingsUI();
+  }
+  else if (f.startsWith('sp')) {
+    const i=parseInt(f.slice(2));
+    if(S.editProg){S.editProg.steps[i].pos=v;saveLS();renderEditSteps();}
+  }
+  else if (f.startsWith('sc')) {
+    const i=parseInt(f.slice(2));
+    if(S.editProg){S.editProg.steps[i].count=v;saveLS();renderEditSteps();}
+  }
+  else if (f.startsWith('CT')) {
+    const i=parseInt(f.slice(2));
+    S.materials[S.matIdx].comps[i].t=v;
+    S.materials[S.matIdx].comps.sort((a,b)=>a.t-b.t);
+    saveLS(); renderCompTable();
+  }
+  else if (f.startsWith('CC')) {
+    const i=parseInt(f.slice(2));
+    S.materials[S.matIdx].comps[i].c=v; saveLS(); renderCompTable();
+  }
+  npcancel();
+}
+// Keyboard support
+document.addEventListener('keydown',e=>{
+  if(!document.getElementById('numpad-ovl').classList.contains('active')) return;
+  if(e.key>='0'&&e.key<='9') npk(e.key);
+  else if(e.key==='.') npk('.');
+  else if(e.key==='-') npk('-');
+  else if(e.key==='Backspace') npbs();
+  else if(e.key==='Enter') npconfirm();
+  else if(e.key==='Escape') npcancel();
+});
+
+// ═══════════════════════════════════════════════════════════
+//  SCREEN NAVIGATION
+// ═══════════════════════════════════════════════════════════
+const NAVMAP = {
+  'screen-home':    'nav-home',
+  'screen-programs':'nav-programs',
+  'screen-edit':    'nav-programs',
+  'screen-manual':  'nav-manual',
+  'screen-counter': 'nav-counter',
+  'screen-settings':'nav-settings',
+  'screen-materials':null,
+  'screen-diag':    'nav-info',
+  'screen-info':    'nav-info',
+};
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  const n=NAVMAP[id]; if(n) document.getElementById(n).classList.add('active');
+  if(id==='screen-programs') renderPrograms();
+  if(id==='screen-settings') renderSettings();
+  if(id==='screen-materials'){renderMatList();renderCompTable();}
+}
+function showOvl(id) {
+  if(id==='ovl-zero') document.getElementById('zero-pos').textContent=S.position.toFixed(2)+' mm';
+  document.getElementById(id).classList.add('active');
+}
+function hideOvl(id) { document.getElementById(id).classList.remove('active'); }
+
+// ═══════════════════════════════════════════════════════════
+//  CLOCK + UPTIME
+// ═══════════════════════════════════════════════════════════
+function p2(n){return String(n).padStart(2,'0');}
+setInterval(()=>{
+  const d=new Date();
+  document.getElementById('tb-time').textContent=p2(d.getHours())+':'+p2(d.getMinutes());
+  S.uptime++;
+  const h=Math.floor(S.uptime/3600),m=Math.floor((S.uptime%3600)/60),s=S.uptime%60;
+  document.getElementById('dg-uptime').textContent=p2(h)+':'+p2(m)+':'+p2(s);
+},1000);
+
+// ═══════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════
+renderSettings();
+renderPrograms();
+renderMatList();
+renderCompTable();
+updateMatUI();
+updateCountUI();
+updatePosUI();
+updateTgtUI();
+</script>
+</body>
+</html>

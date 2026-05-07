@@ -1,0 +1,86 @@
+#ifndef UI_STRINGS_H
+#define UI_STRINGS_H
+
+// Language enum
+enum Language {
+  LANG_SERBIAN = 0,
+  LANG_ENGLISH = 1
+};
+
+extern Language g_language;
+
+// String IDs
+enum StringID {
+  // Common
+  STR_READY,
+  STR_MOTOR_ERROR,
+  STR_HOMING_REQUIRED,
+  STR_MOVE_AWAY,
+  STR_MOVE_CLOSE,
+  STR_POSITION,
+  STR_TARGET,
+  STR_MACHINE,
+  STR_MM,
+  STR_GO_TO,
+  STR_START,
+  STR_STOP,
+  STR_HOMING,
+  STR_AUTO_RETRACT,
+  STR_SAVE_SETTINGS,
+  STR_NAME,
+  STR_THICKNESS,
+  STR_OFFSET,
+  STR_SELECT_MATERIAL,
+  STR_NOT_SELECTED,
+  STR_STEP,
+  STR_PARTS,
+  STR_SELECT_PROGRAM_START,
+  STR_MATERIAL,
+  STR_ALARMS,
+  STR_ALARM_MESSAGE,
+  STR_TEST_TOGGLE,
+  STR_TARGET_SET,
+  STR_MOTOR_POS,
+  STR_PART_COUNT,
+  STR_STEP_COUNT,
+  STR_STEP_POSITION,
+  
+  // Settings
+  STR_SETTINGS,
+  STR_LANGUAGE,
+  STR_LANGUAGE_SERBIAN,
+  STR_LANGUAGE_ENGLISH,
+  STR_HOMING_FAST,
+  STR_HOMING_SLOW,
+  STR_RETRACT_OFFSET,
+  STR_AUTO_RETRACT_SPEED,
+  STR_STEP_SIZE,
+  STR_POSITIONING,
+  STR_STEP_MM,
+  
+  // Programs & Materials
+  STR_PROGRAMS,
+  STR_MATERIALS,
+  STR_EDIT,
+  STR_ADD,
+  STR_DELETE,
+  STR_PROGRAM_NAME,
+  STR_MATERIAL_NAME,
+  
+  // Auto mode
+  STR_AUTO_MODE,
+  STR_AUTO_WAITING_BEND,
+  STR_AUTO_RETRACTING,
+  STR_AUTO_PAUSED,
+  STR_AUTO_COMPLETED,
+  
+  STR_COUNT // Must be last
+};
+
+// Get string based on current language
+const char* get_string(StringID id);
+
+// Set language and save to storage
+void set_language(Language lang);
+
+#endif

@@ -1,0 +1,31 @@
+# PlatformIO build output
+**/.pio/
+
+# VS Code
+.vscode/
+
+# Logs and temporary outputs
+**/build_log.txt
+**/build_out.txt
+**/build_output.txt
+*.log
+
+# Archives and backups
+backup_*.zip
+*.zip
+
+# OS artifacts
+Thumbs.db
+Desktop.ini
+
+# Optional media files not required for firmware source
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.webp
+*.avif
+
+# Python/cache artifacts if they appear
+__pycache__/
+*.pyc

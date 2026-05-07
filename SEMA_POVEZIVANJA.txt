@@ -1,0 +1,421 @@
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║           KOMPLETNA ŠEMA POVEZIVANJA — CNC BACK GAUGE ZA PRESU                 ║
+║           Verzija FINAL — sve provjeri i ispravljeno                           ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+KORAK 1 — NAPAJANJE DRAJVERA (motor snaga)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  PSU 36V (V+)  ──────────────► AC  (levi terminal na drajveru)
+  PSU 36V (GND) ──────────────► AC  (desni terminal na drajveru)
+
+  Napomena: drajver ima 2 terminala oznacena "AC 18-80V".
+            DC napajanje 36V radi savrseno.
+            Polaritet nije kriticno — interno ispravlja.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+KORAK 2 — LOGICKO NAPAJANJE (5V za signale, ESP32, senzore)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  PSU 24V (V+)  ──► LM2596 (IN+)
+  PSU 24V (GND) ──► LM2596 (IN-)
+
+  LM2596 izlaz:
+    OUT+ = 5V magistrala   ← PODESI TRIMMER NA 5.0V PRE SPAJANJA!
+    OUT- = GND magistrala
+
+  5V magistrala se koristi za:
+    ├── ESP32-WROOM32  VIN pin
+    ├── ESP32-S3 HMI   VIN pin
+    ├── PUL+ na drajveru
+    ├── DIR+ na drajveru
+    └── ENA+ na drajveru (kroz E-STOP tipkalo)
+
+  24V magistrala se koristi za:
+    └── senzori induktivni — braon zica (VCC)
+
+  GND magistrala — SVE ovo mora biti fizicki spojeno zajedno:
+    ├── PSU 24V GND
+    ├── LM2596 OUT-
+    ├── ESP32-WROOM32 GND pin
+    ├── ESP32-S3 HMI GND pin
+    ├── Senzori plava zica (GND)
+    └── ALM- na drajveru
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+KORAK 3 — MOTOR FAZE → DRAJVER  (kabl sa 4 zice)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Provjera multimetrom (rezim otpor) — imas vec potvrdjeno:
+    CRNA + PLAVA  piska = isti par = Faza A
+    BELA + ZELENA piska = isti par = Faza B
+
+  Spajanje:
+    CRNA   ──► A+  (drajver)
+    PLAVA  ──► A-  (drajver)
+    BELA   ──► B+  (drajver)
+    ZELENA ──► B-  (drajver)
+
+  Ako motor rotira u pogresnom smeru: zameni CRNA ↔ PLAVA
+  Ako motor vibrira ali ne rotira:    zameni BELA ↔ ZELENA
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+KORAK 4 — ENKODER → DRAJVER  (kabl sa 6 zica)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Spajanje na sekciju ENCODER na drajveru:
+    ZUTA   ──► VCC    (5V iz drajvera ka enkoderu — SAMO na drajver!)
+    ZELENA ──► EGND   (masa enkodera)
+    CRNA   ──► EA+
+    PLAVA  ──► EA-
+    CRVENA ──► EB+
+    BELA   ──► EB-
+
+  VAZNO: VCC i EGND se NIKAD ne spajaju na tvoju 5V magistralu.
+         Drajver sam napaja enkoder iz internog regulatora.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+KORAK 5 — ESP32 → DRAJVER CONTROL SIGNAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  PRINCIP: 5V ide na + strane (PUL+, DIR+, ENA+).
+           ESP32 GPIO kontrolise - strane (PUL-, DIR-, ENA-).
+           GPIO LOW  = struja tece kroz optocoupler = signal AKTIVAN.
+           GPIO HIGH = nema dovoljne razlike = signal NEAKTIVAN.
+           Krug se zatvara kroz zajednicku GND magistralu.
+
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │                                                                      │
+  │  PUL — KORAK MOTORA:                                                 │
+  │    5V mag. ──[E-STOP NC]────────────────────► PUL+  (drajver)        │
+  │    ESP32 GPIO18  ──── [220Ω] ───────────────► PUL-  (drajver)       │
+  │                                                                      │
+  │  DIR — SMER KRETANJA:                                                │
+  │    5V magistrala ────────────────────────────► DIR+  (drajver)       │
+  │    ESP32 GPIO19  ──── [220Ω] ───────────────► DIR-  (drajver)       │
+  │                                                                      │
+  │  ENA — ENABLE MOTORA:                                               │
+  │                                                                      │
+  │    5V magistrala ────────────────────────────► ENA+  (drajver)       │
+  │    ENA-  ── OTKACEN, nista ne spajati                               │
+  │                                                                      │
+  │    P108 = 0001: drajver u potpunosti ignorise ENA pin                │
+  │    Motor uvijek energiziran i drzi poziciju.                         │
+  │    Sigurnost je hardverski rijesena kroz E-STOP na PUL+.             │
+  │                                                                      │
+  │    ZASTO ne vezemo ENA na ESP32:                                     │
+  │    ZDM ima interni pull-up na ENA- prema 5V.                         │
+  │    Ta 5V se vraca nazad na ESP32 GPIO (max 3.3V) = ostecenje pina.   │
+  │    Rijesenje: ENA ostaje otkacen, P108=0001.                         │
+  │                                                                      │
+  │    ESP32 GPIO21 ──[220Ω]──┐                                          │
+  │                           ├──── CVOR ──► ENA-  (drajver)             │
+  │    ESP32 3.3V   ──[10kΩ]──┘                                          │
+  │                                                                      │
+  │  ZASTO PULLUP (10kΩ na 3.3V)?                                        │
+  │                                                                      │
+  │  GPIO21 kada ESP32 radi normalno (P108=0000):                        │
+  │    LOW  = 0V   → 5-0=5V razlika → optokapler UPALI → motor RADI     │
+  │    HIGH = 3.3V → 5-3.3=1.7V    → optokapler NE PALI → E.no          │
+  │                                                                      │
+  │  GPIO21 kada ESP32 se tek UKLJUCIO i jos buta (~1 sekunda):          │
+  │    Pin je "floating" — lebdi izmedju 0V i 3.3V                      │
+  │    Mogao bi pasti na LOW → optokapler upali → motor krene ODMAH      │
+  │    — TO JE OPASNO na presi!                                          │
+  │                                                                      │
+  │  10kΩ pullup RESAVA ovaj problem:                                    │
+  │    Dok GPIO21 lebdi → 10kΩ drzi cvor na 3.3V = SIGURNO HIGH         │
+  │    = E.no stanje = motor ONEMOGUCEN dok firmware ne poz. enable()    │
+  │                                                                      │
+  │  ALM — ALARM (signal DOLAZI IZ drajvera, suprotan smer!):            │
+  │                                                                      │
+  │    ESP32 3.3V   ──[10kΩ]──┐                                          │
+  │                           ├──── CVOR ──► ALM+  (drajver)             │
+  │    ESP32 GPIO22 ───────────┘  (samo cita napon, nista ne salje)      │
+  │    GND magistrala ────────────────────────────► ALM-  (drajver)      │
+  │                                                                      │
+  │  ZASTO PULLUP (10kΩ na 3.3V) I OVDE?                                │
+  │                                                                      │
+  │  ALM izlaz na drajveru je "open-collector":                          │
+  │    To znaci: unutar drajvera postoji tranzistor koji moze samo       │
+  │    da SPOJI ALM+ sa ALM- (GND). On NE moze sam da postavi 3.3V.     │
+  │    Bez pullupa, ALM+ bi bio "u vazduhu" i GPIO22 bi citao gluposti.  │
+  │                                                                      │
+  │  Sa pullupom:                                                        │
+  │    Sve OK (nema alarma):                                             │
+  │      Drajver tranzistor = OFF = ALM+ nije spojen ni na sta           │
+  │      10kΩ drzi ALM+ na 3.3V → GPIO22 cita HIGH = sve OK             │
+  │                                                                      │
+  │    ALARM (drajver detektovao gresku):                                │
+  │      Drajver tranzistor = ON = ALM+ spojen na ALM- (GND)            │
+  │      ALM+ povucen na 0V → GPIO22 cita LOW = ALARM!                  │
+  │                                                                      │
+  │  PEND — IN-POSITION SIGNAL (NE KORISTIMO SADA):                     │
+  │    PEND+ i PEND- ostavljamo NEPOVEZANE.                              │
+  │    Ovo je izlaz sa drajvera koji signalizira da je motor dostigao    │
+  │    zadatu poziciju. Mozemo ga koristiti u buducoj verziji firmware.  │
+  │                                                                      │
+  └──────────────────────────────────────────────────────────────────────┘
+
+  Sta znaci u kodu:
+    GPIO18 LOW  = napravi jedan korak
+    GPIO19 LOW  = kreci napred          GPIO19 HIGH = kreci nazad
+    GPIO21      = NIJE VEZAN (ENA otkacen, P108=0001)
+    GPIO22 LOW  = drajver ima gresku (ALARM stanje)
+
+  NAPOMENA ENA:
+    ZDM ima interni pull-up na ENA- prema 5V.
+    Svaki pokusaj vezivanja ESP32 GPIO (3.3V logika) na ENA- vraca 5V nazad
+    na GPIO pin sto moze osteciti ESP32. ENA se ne vezuje na ESP32.
+    P108=0001 cini ENA pin potpuno neaktivnim na drajveru.
+
+  Otpornici:
+    [330Ω] boje: NARANDZASTA-NARANDZASTA-BRAON-ZLATNA  (za GPIO18, GPIO19, GPIO21)
+    [10kΩ] boje: BRAON-CRNA-NARANDZASTA-ZLATNA         (za ENA pullup i ALM pullup)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+KORAK 6 — E-STOP TIPKALO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  E-STOP je NC tipkalo (normalno zatvoreno).
+  Ulazi SAMO u liniju 5V → PUL+. Nema veze sa ESP32. Nema veze sa ENA.
+
+  5V magistrala ──► [E-STOP NC] ──► PUL+  (drajver)
+  5V magistrala ──────────────────► ENA+  (drajver)  ← direktno, bez E-STOP
+
+  Normalno:   tipkalo zatvoreno → 5V prolazi → PUL+ ima napon → motor prima korake
+  Pritisnuto: tipkalo otvoreno  → PUL+ = 0V → optokapler za korake se ne upali
+              → motor ne prima korake i STAJE, ali ostaje zakljucan (drzi poziciju)
+
+  Motor staje HARDVERSKI — bez ikakve uloge ESP32 ili softvera.
+  GPIO21 i ENA kolo se ne menjaju pri E-STOP.
+
+  ZASTO PUL+ a ne ENA+:
+  ENA aktivan (struja kroz optokapler) = "Free Shaft" = motor SLOBODAN.
+  Ako bi E-STOP prekidao ENA+, u trenutku panike motor bi se oslobodio —
+  ako ESP32 i dalje salje PUL impulse, motor bi nastavio da se pomera.
+  Na PUL+: nema 5V = nema impulsa = motor STAJE i drzi poziciju (zakljucan).
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+KORAK 7 — INDUKTIVNI SENZORI → PC817 → ESP32
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Senzori rade na 24V, ESP32 na 3.3V. PC817 modul pravi nivo-pomak.
+  Senzori su NPN tipa: braon=VCC, plava=GND, crna=signal.
+
+  PINOVI MODULA:
+    Ulazni red:  IN1  G  IN2  G  IN3  G  IN4  G
+    Izlazni red: V1   G  V2   G  V3   G  V4   G
+
+  NAPOMENA: G je ZAJEDNICKI na obje strane — jedan GND cvor.
+            Nema prave galvanske izolacije, ali je OK jer
+            senzori i ESP32 ionako dijele istu GND magistralu.
+
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │                                                                      │
+  │  Spajanje za JEDAN senzor (ponavlja se za svaki kanal):              │
+  │                                                                      │
+  │    Senzor braon ──────────────────────────────► 24V magistrala       │
+  │    Senzor plava ──────────────────────────────► G  (modul)           │
+  │    Senzor crna  ──────────────────────────────► IN1 (modul)          │
+  │                                                                      │
+  │    ESP32 GPIO25 ──────────────────────────────► V1  (modul)          │
+  │                 (interni pull-up u kodu: INPUT_PULLUP)               │
+  │                                                                      │
+  │    G (modul) ─────────────────────────────────► GND magistrala       │
+  │                                                                      │
+  └──────────────────────────────────────────────────────────────────────┘
+
+  Kako radi:
+    Senzor ne detektuje: NPN crna zica = floating → nema struje kroz LED
+      → PC817 tranzistor OFF → V pin nije spojen ni na sta
+      → interni pull-up drzi GPIO na 3.3V → GPIO = HIGH
+
+    Senzor detektuje metal: NPN crna zica = GND → struja tece kroz LED (IN→G)
+      → PC817 tranzistor ON → V pin spojen na G (GND)
+      → GPIO povucen na 0V → GPIO = LOW
+
+  Logika:
+    GPIO HIGH = senzor ne detektuje nista = slobodan put
+    GPIO LOW  = senzor detektovao metal = dosli smo do kraja / home pozicije
+
+  ZASTO GPIO25/26/27 (a ne GPIO34/35/36):
+    GPIO34/35/36 su input-only pinovi BEZ internog pull-upa — trebali bi
+    vanjski otpornici. GPIO25/26/27 imaju interni pull-up (~45kΩ) koji
+    aktiviramo sa pinMode(pin, INPUT_PULLUP) — nema vanjskih otpornika.
+
+  Raspored:
+    Homing senzor (0 pozicija)  → IN1/V1 → ESP32 GPIO25  (INPUT_PULLUP)
+    Max limit senzor (kraj)     → IN2/V2 → ESP32 GPIO26  (INPUT_PULLUP)
+    Emergency hardware limit    → IN3/V3 → ESP32 GPIO27  (INPUT_PULLUP)
+
+  Vanjski otpornici za senzore: NISU POTREBNI
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+KORAK 8 — PRESSURE TRANSDUCER (senzor pritiska ulja)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Transducer (3 zice, izlaz 0-5V analogni signal):
+    VCC    ──► 5V magistrala
+    GND    ──► GND magistrala
+    Signal ──► razdelnik napona ──► ESP32 GPIO39
+
+  Razdelnik napona je OBAVEZAN jer ESP32 ADC prima max 3.3V:
+
+    Transducer signal
+          │
+        [5kΩ]
+          │
+          ├──────────────────────► ESP32 GPIO39 (ADC)
+          │
+        [10kΩ]
+          │
+         GND magistrala
+
+  Matematika: 5V × (10kΩ / 15kΩ) = 3.33V max na GPIO39 — bezbedno.
+  Otpornik  5kΩ: ZELENA-CRNA-CRVENA-ZLATNA
+  Otpornik 10kΩ: BRAON-CRNA-NARANDZASTA-ZLATNA
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+KORAK 9 — UART IZMEDJU DVA ESP32
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ESP32-WROOM32 (kontroler)     ESP32-S3 HMI (ekran)
+  GPIO17 TX2  ─────────────────► RX  (provjeri pinout ploce)
+  GPIO16 RX2  ◄───────────────── TX  (provjeri pinout ploce)
+  GND         ─────────────────► GND  ← OBAVEZNO
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PREGLED SVIH PINOVA — ESP32-WROOM32
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  VIN    ← 5V magistrala (napajanje modula)
+  GND    ← GND magistrala
+
+  GPIO16 ← RX2  (UART prijem od HMI)
+  GPIO17 → TX2  (UART slanje ka HMI)
+
+  GPIO18 → PUL-  kroz [330Ω] ka drajveru  (korak motora)
+  GPIO19 → DIR-  kroz [330Ω] ka drajveru  (smer kretanja)
+  GPIO21 → ENA-  kroz [330Ω] ka drajveru  (enable/disable motora)
+  3.3V   → [10kΩ] → spaja se na GPIO21/ENA- cvor  (pullup)
+
+  GPIO22 ← ALM+  od drajvera
+  3.3V   → [10kΩ] → spaja se na GPIO22/ALM+ cvor  (pullup)
+  GND    → ALM-  na drajveru
+
+  GPIO25 ← izlaz PC817 #1  (homing senzor)      — INPUT_PULLUP u kodu
+  GPIO26 ← izlaz PC817 #2  (max limit senzor)   — INPUT_PULLUP u kodu
+  GPIO27 ← izlaz PC817 #3  (emergency limit)    — INPUT_PULLUP u kodu
+
+  GPIO39 ← pressure transducer signal (kroz 5kΩ/10kΩ razdelnik)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+KORAK 10 — PARAMETRI DRAJVERA ZDM-2HA865
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Ulaz u meni: drzi ENTER 3-5 sekundi → pojavi se P001
+  Navigacija:  GORE/DOLE = biranje parametra
+               ENTER     = ulaz u parametar / snimanje promjene
+               NAZAD     = izlaz bez snimanja
+
+  ┌─────────┬──────────────────────────────────┬───────────┬───────────┬──────────┐
+  │ Param   │ Opis                             │ Ocitano   │ Treba     │ Status   │
+  ├─────────┼──────────────────────────────────┼───────────┼───────────┼──────────┤
+  │ P001    │ Microstepping (mnozilac)         │ 0010      │ 0016      │ PROMIJENI│
+  │         │  10 × 200 = 2000 koraka/okr     │           │ 16×200    │          │
+  │         │  TREBA: 16 × 200 = 3200 kor/okr │           │ =3200     │          │
+  ├─────────┼──────────────────────────────────┼───────────┼───────────┼──────────┤
+  │ P002    │ Smjer rotacije motora            │ 0000      │ 0000      │ OK       │
+  │         │  0=normalan, 1=obrnut            │           │           │          │
+  ├─────────┼──────────────────────────────────┼───────────┼───────────┼──────────┤
+  │ P003    │ Tip motora (velicina)            │ 0086      │ 0057      │ PROMIJENI│
+  │         │  57 = NEMA23 (57/60mm) ← TVOJ  │           │           │          │
+  │         │  86 = NEMA34 (86mm)   ← POGRESNO│           │           │          │
+  ├─────────┼──────────────────────────────────┼───────────┼───────────┼──────────┤
+  │ P004    │ Max dozvoljena greska pozicije   │ 4000      │ 4000      │ OK       │
+  │         │  (enkoder impulsi) — alarm limit │           │           │          │
+  ├─────────┼──────────────────────────────────┼───────────┼───────────┼──────────┤
+  │ P005    │ Struja mirovanja (% od radne)    │ 0050      │ 0050      │ OK       │
+  │         │  50% = motor drzi poziciju tiho  │           │           │          │
+  ├─────────┼──────────────────────────────────┼───────────┼───────────┼──────────┤
+  │ P006    │ Elektronski gear — brojnik       │ 0001      │ 0001      │ OK       │
+  │ P007    │ Elektronski gear — nazivnik      │ 0001      │ 0001      │ OK       │
+  │         │  Omjer 1:1 = svaki PUL = 1 korak │           │           │          │
+  ├─────────┼──────────────────────────────────┼───────────┼───────────┼──────────┤
+  │ P020    │ Broji ulaznih impulsa — niske 4  │ 0000      │ (prikaz)  │ OK       │
+  │ P021    │ Broji ulaznih impulsa — visoke 4 │ 0000      │ (prikaz)  │ OK       │
+  │         │  Samo za monitoring — ne mijenja  │           │           │          │
+  ├─────────┼──────────────────────────────────┼───────────┼───────────┼──────────┤
+  │ P100    │ Radna struja (% max)             │ 0100      │ NE DIRAJ  │ FABRIKA  │
+  │ P101    │ Stujni regulator — P koef.       │ 0115      │ NE DIRAJ  │ FABRIKA  │
+  │ P102    │ Strujni regulator — I koef.      │ 0145      │ NE DIRAJ  │ FABRIKA  │
+  │ P103    │ Strujni regulator — D koef.      │ 0830      │ NE DIRAJ  │ FABRIKA  │
+  ├─────────┼──────────────────────────────────┼───────────┼───────────┼──────────┤
+  │ P104    │ Brzinski regulator — P koef.     │ 0075      │ 0075      │ OK       │
+  │ P105    │ Brzinski regulator — I koef.     │ 0070      │ 0070      │ OK       │
+  │ P106    │ Pozicijski regulator — P koef.   │ 0060      │ 0060      │ OK       │
+  │ P107    │ Feedforward koeficijent          │ 0095      │ 0095      │ OK       │
+  ├─────────┼──────────────────────────────────┼───────────┼───────────┼──────────┤
+  │ P108    │ Interni enable mod               │ 0001      │ 0000      │ PROMIJENI│
+  │         │  0 = vanjski ENA signal (ESP32)  │           │           │          │
+  │         │  1 = uvijek ukljucen (ignoriše   │           │           │          │
+  │         │      ENA pin) — OPASNO za presu! │           │           │          │
+  ├─────────┼──────────────────────────────────┼───────────┼───────────┼──────────┤
+  │ P109    │ Brzinski regulator — D koef.     │ 0015      │ 0015      │ OK       │
+  │ P110    │ Nivo ulaz/izlaz signala          │ 0020      │ 0020      │ OK       │
+  ├─────────┼──────────────────────────────────┼───────────┼───────────┼──────────┤
+  │ P111    │ Tacnost pozicioniranja           │ 0001      │ 0001      │ OK       │
+  │         │  ±1 enkoder impuls               │           │           │          │
+  │ P112    │ Potiskivanje rezonancije         │ 0006      │ 0006      │ OK       │
+  └─────────┴──────────────────────────────────┴───────────┴───────────┴──────────┘
+
+  OSTALI PARAMETRI (nisu ocitani, fabricke vrijednosti):
+    P200 = Mod rada:       0 = pulse/dir (nas mod) ← ne mijenjati
+    P304 = Enkoder linija: default 1000 linija ← provjeri ako motor loze radi
+    P300 = Open-loop struja: 4.8A ← koristi se samo ako P200=3
+
+  PARAMETRI KOJE TREBA PROMIJENITI (REDOSLJED):
+    1. P003: 0086 → 0057  (tip motora NEMA23)      ← NAJVAZNIJE
+    2. P001: 0010 → 0016  (microstepping 3200 kor/okr)
+    3. P108: 0001 → 0000  (vanjski ENA pin aktivan)
+
+  NAPOMENA: Nakon promjene P003 drajver ce mozda automatski resetovati
+            P104-P109 na fabricke vrijednosti za NEMA23. To je normalno.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+KOMPONENTE — STATUS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  IMAS:
+    Motor NEMA23 sa enkoderom
+    Drajver ZDM-2HA865
+    Linearna mehanika set (1605 + SBR16)
+    PSU 36V 13A
+    PSU 24V 20A
+    LM2596 step-down modul
+    PC817 optocoupler moduli
+
+  TREBA KUPITI:
+    ESP32-WROOM32 DevKit
+    ESP32-S3 7" LCD Waveshare
+    2x induktivni senzor NPN-NO  tip: LJ12A3-4-Z/BX
+    1x induktivni senzor NPN-NC  tip: LJ12A3-4-Z/BY
+    Pressure transducer 0-5V, 0-400 bar, 3-zicni
+    E-STOP NC mushroom tipkalo
+    Otpornici 330Ω x3  (narandzasta-narandzasta-braon-zlatna)  ← IZ LADICE
+    Otpornici 10kΩ x3  (braon-crna-narandzasta-zlatna)           ← IZ LADICE
+    Otpornik   5kΩ x1  (zelena-crna-crvena-zlatna)               ← IZ LADICE

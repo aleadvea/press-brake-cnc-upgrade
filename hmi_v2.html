@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+<meta charset="UTF-8">
+<title>Back Gauge HMI v2</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#0a0c12;--bg2:#12151f;--bg3:#1c2030;--bg4:#252a3a;
+  --blue:#3b82f6;--green:#22c55e;--red:#ef4444;--orange:#f97316;
+  --text:#f8fafc;--text2:#64748b;--text3:#94a3b8;--border:#1e2537;
+  --r:10px;
+}
+html,body{width:800px;height:480px;overflow:hidden;background:#000;
+  font-family:'Segoe UI',Arial,sans-serif;color:var(--text);user-select:none;}
+#app{width:800px;height:480px;position:relative;background:var(--bg);overflow:hidden;}
+
+/* ─── STATUSBAR ─── */
+#sb{height:30px;background:var(--bg2);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 14px;gap:12px;flex-shrink:0;}
+.sb-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text3);}
+.sb-item b{color:var(--text);font-size:12px;}
+.pill{padding:2px 9px;border-radius:20px;font-size:10px;font-weight:800;letter-spacing:.4px;}
+.p-ready{background:#14532d;color:#4ade80;border:1px solid #16a34a;}
+.p-moving{background:#1e3a5f;color:#60a5fa;border:1px solid #2563eb;}
+.p-homing{background:#431407;color:#fb923c;border:1px solid #ea580c;}
+.p-nohome{background:#1c1917;color:#78716c;border:1px solid #44403c;}
+.p-error{background:#450a0a;color:#fca5a5;border:1px solid #dc2626;}
+#sb-spc{flex:1;}
+#sb-time{font-size:12px;color:var(--text3);}
+#sb-menu{width:30px;height:30px;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;color:var(--text3);margin-right:-14px;}
+#sb-menu:hover{color:var(--text);}
+
+/* ─── MAIN LAYOUT ─── */
+#main{display:flex;height:450px;}
+
+/* ─── LEFT PANEL — RUN ─── */
+#panel-run{width:460px;display:flex;flex-direction:column;padding:14px 12px 12px 14px;
+  gap:10px;border-right:1px solid var(--border);}
+
+.pos-block{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);
+  padding:12px 16px;display:flex;flex-direction:column;}
+.pos-label{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text2);margin-bottom:2px;}
+.pos-work{font-size:72px;font-weight:900;line-height:1;letter-spacing:-3px;color:#fff;
+  font-variant-numeric:tabular-nums;}
+.pos-unit{font-size:22px;color:var(--text3);font-weight:400;}
+.pos-machine{font-size:12px;color:var(--text2);margin-top:4px;}
+.pos-machine span{color:var(--text3);}
+.pos-comp{font-size:11px;color:var(--orange);margin-top:2px;}
+
+.tgt-block{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);
+  padding:10px 14px;display:flex;align-items:center;gap:10px;}
+.tgt-lbl{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;width:40px;}
+.tgt-val{flex:1;font-size:32px;font-weight:800;color:var(--blue);cursor:pointer;
+  font-variant-numeric:tabular-nums;text-align:right;}
+.tgt-val:hover{color:#93c5fd;}
+.tgt-unit{font-size:14px;color:var(--text3);}
+.tgt-adj{display:flex;flex-direction:column;gap:3px;}
+.tadj{width:30px;height:22px;background:var(--bg3);border:1px solid var(--border);
+  border-radius:5px;color:var(--text3);cursor:pointer;font-size:13px;font-weight:800;}
+.tadj:hover{background:var(--bg4);color:var(--text);}
+
+.adj-btns{display:flex;gap:5px;}
+.adv{flex:1;height:34px;background:var(--bg3);border:1px solid var(--border);
+  border-radius:7px;color:var(--text3);cursor:pointer;font-weight:700;font-size:12px;}
+.adv:hover{background:var(--bg4);color:var(--text);}
+.adv.p{background:#1a2f50;border-color:var(--blue);color:#93c5fd;}
+
+.act-btns{display:flex;gap:8px;margin-top:auto;}
+.abtn{flex:1;border:none;border-radius:var(--r);cursor:pointer;font-weight:800;
+  font-size:18px;height:58px;display:flex;align-items:center;justify-content:center;gap:7px;
+  transition:filter .1s;}
+.abtn:hover{filter:brightness(1.1);}
+.abtn:active{filter:brightness(.85);}
+.a-go  {background:var(--green);color:#fff;}
+.a-home{background:#1d4ed8;color:#fff;font-size:15px;}
+.a-stop{background:var(--red);color:#fff;}
+
+/* ─── RIGHT PANEL ─── */
+#panel-right{flex:1;display:flex;flex-direction:column;gap:0;}
+
+/* Tabs */
+#rtabs{display:flex;background:var(--bg2);border-bottom:1px solid var(--border);}
+.rtab{flex:1;height:38px;display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:700;cursor:pointer;color:var(--text3);
+  border-bottom:2px solid transparent;letter-spacing:.3px;transition:color .15s;}
+.rtab:hover{color:var(--text);}
+.rtab.active{color:var(--blue);border-bottom-color:var(--blue);}
+
+#rtabcontent{flex:1;overflow-y:auto;padding:10px;}
+
+/* ── INFO TAB ── */
+.icard{background:var(--bg2);border:1px solid var(--border);border-radius:8px;
+  padding:10px 12px;margin-bottom:7px;}
+.ic-row{display:flex;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);}
+.ic-row:last-child{border-bottom:none;}
+.ic-lbl{font-size:11px;color:var(--text2);flex:1;}
+.ic-val{font-size:13px;font-weight:700;}
+
+/* ── PROGRAMS TAB ── */
+.prog-item{display:flex;align-items:center;gap:8px;padding:8px 10px;
+  background:var(--bg2);border:1px solid var(--border);border-radius:8px;
+  margin-bottom:5px;cursor:pointer;}
+.prog-item:hover{border-color:var(--blue);}
+.prog-item.loaded{border-color:var(--green);background:#0d1f14;}
+.pi-num{font-size:11px;color:var(--text2);width:16px;}
+.pi-name{flex:1;font-weight:700;font-size:13px;}
+.pi-info{font-size:11px;color:var(--text3);}
+.pi-load{height:26px;padding:0 10px;background:var(--blue);border:none;border-radius:6px;
+  color:#fff;font-weight:700;font-size:11px;cursor:pointer;}
+.pi-load:hover{background:#2563eb;}
+
+/* ── MANUAL TAB ── */
+.jog-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
+.jbig{width:64px;height:64px;border-radius:9px;background:var(--blue);border:none;
+  color:#fff;font-size:24px;font-weight:900;cursor:pointer;}
+.jbig:hover{background:#2563eb;}
+.jbig:active{background:#1d4ed8;}
+.jmid{flex:1;text-align:center;}
+.jpos{font-size:28px;font-weight:900;font-variant-numeric:tabular-nums;}
+.step-row{display:flex;gap:4px;}
+.sb2{flex:1;height:30px;background:var(--bg3);border:1px solid var(--border);
+  border-radius:6px;color:var(--text3);font-weight:700;font-size:11px;cursor:pointer;}
+.sb2:hover{background:var(--bg4);}
+.sb2.on{background:var(--blue);border-color:var(--blue);color:#fff;}
+
+/* ── SETTINGS TAB ── */
+.set-row{display:flex;align-items:center;padding:8px 10px;background:var(--bg2);
+  border:1px solid var(--border);border-radius:7px;margin-bottom:4px;cursor:pointer;}
+.set-row:hover{border-color:var(--blue);}
+.sr-lbl{flex:1;font-size:12px;}
+.sr-val{font-weight:700;color:var(--blue);font-size:14px;margin-right:4px;}
+.sr-unit{font-size:10px;color:var(--text2);width:40px;text-align:right;}
+
+/* ─── MENU PANEL (slide-over) ─── */
+#menu-panel{position:absolute;top:0;right:-260px;width:260px;height:100%;
+  background:var(--bg2);border-left:1px solid var(--border);z-index:50;
+  transition:right .25s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;}
+#menu-panel.open{right:0;}
+#menu-overlay{position:absolute;inset:0;background:rgba(0,0,0,.5);z-index:49;
+  display:none;backdrop-filter:blur(2px);}
+#menu-overlay.open{display:block;}
+.menu-header{height:50px;display:flex;align-items:center;padding:0 16px;
+  border-bottom:1px solid var(--border);font-weight:800;font-size:14px;
+  letter-spacing:.5px;justify-content:space-between;}
+.menu-item{display:flex;align-items:center;gap:10px;padding:13px 16px;
+  cursor:pointer;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;}
+.menu-item:hover{background:var(--bg3);}
+.menu-icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;
+  justify-content:center;font-size:16px;flex-shrink:0;}
+.mi-blue{background:#1e3a5f;}
+.mi-green{background:#14532d;}
+.mi-orange{background:#431407;}
+.mi-gray{background:var(--bg4);}
+.menu-sep{height:1px;background:var(--border);margin:4px 16px;}
+.menu-version{padding:10px 16px;font-size:10px;color:var(--text2);margin-top:auto;}
+
+/* ─── COORDINATE MODE BADGE ─── */
+.coord-badge{display:inline-flex;gap:0;border:1px solid var(--border);border-radius:6px;
+  overflow:hidden;margin-left:6px;}
+.cb-opt{padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer;color:var(--text3);}
+.cb-opt.on{background:var(--blue);color:#fff;}
+
+/* ─── HOMING OVERLAY ─── */
+#hom-ovl{position:absolute;inset:0;background:rgba(0,0,0,.85);z-index:100;
+  display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;}
+#hom-ovl.on{display:flex;}
+.hom-title{font-size:18px;font-weight:800;color:var(--orange);}
+.hom-bar-bg{width:320px;height:14px;background:var(--bg3);border-radius:7px;overflow:hidden;}
+.hom-bar-fill{height:100%;background:var(--blue);border-radius:7px;transition:width .2s;}
+.hom-pct{font-size:14px;color:var(--text3);}
+
+/* ─── NUMPAD ─── */
+#np{position:absolute;inset:0;background:rgba(0,0,0,.88);z-index:200;
+  display:none;align-items:center;justify-content:center;}
+#np.on{display:flex;}
+.npc{background:var(--bg2);border:1px solid var(--border);border-radius:14px;
+  padding:16px;width:270px;}
+.np-lbl{text-align:center;font-size:11px;color:var(--text3);margin-bottom:6px;}
+.np-disp{background:var(--bg);border:1px solid var(--border);border-radius:8px;
+  padding:8px 14px;font-size:28px;font-weight:800;text-align:right;min-height:50px;
+  margin-bottom:10px;font-variant-numeric:tabular-nums;}
+.npg{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;}
+.nk{height:48px;background:var(--bg3);border:1px solid var(--border);
+  border-radius:8px;font-size:18px;font-weight:700;color:var(--text);cursor:pointer;}
+.nk:hover{background:var(--bg4);}
+.nk:active{background:var(--blue);}
+.nk-ok {background:var(--green)!important;color:#fff;}
+.nk-no {color:var(--text2)!important;}
+.nk-del{background:#3d1212!important;color:#fca5a5!important;}
+
+/* ─── PROGRAM EDIT MODAL ─── */
+#prog-modal{position:absolute;inset:0;background:rgba(0,0,0,.88);z-index:150;
+  display:none;align-items:center;justify-content:center;}
+#prog-modal.on{display:flex;}
+.pm-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;
+  width:500px;max-height:430px;display:flex;flex-direction:column;overflow:hidden;}
+.pm-hdr{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;
+  align-items:center;gap:8px;}
+.pm-hdr input{flex:1;background:var(--bg3);border:1px solid var(--border);
+  border-radius:6px;padding:6px 10px;color:var(--text);font-size:14px;font-weight:700;outline:none;}
+.pm-body{flex:1;overflow-y:auto;padding:10px;}
+.pm-step{display:flex;align-items:center;gap:8px;padding:7px 10px;
+  background:var(--bg3);border:1px solid var(--border);border-radius:7px;margin-bottom:5px;}
+.pm-lbl{font-size:11px;color:var(--text2);width:18px;}
+.pm-pos{flex:1;font-weight:700;color:var(--blue);cursor:pointer;font-size:14px;}
+.pm-cnt{font-weight:700;color:var(--green);cursor:pointer;}
+.pm-del{width:26px;height:26px;background:#3d1212;border:none;border-radius:5px;
+  color:#fca5a5;cursor:pointer;font-size:14px;}
+.pm-ftr{padding:10px 16px;border-top:1px solid var(--border);display:flex;gap:8px;}
+
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-thumb{background:var(--border);}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- STATUS BAR -->
+<div id="sb">
+  <div class="sb-item"><span id="sb-badge" class="pill p-nohome">NOT HOMED</span></div>
+  <div class="sb-item" style="margin-left:4px">
+    <span style="font-size:10px;color:var(--text2)">WORK</span>
+    <div class="coord-badge">
+      <span class="cb-opt on" id="cb-g54" onclick="setCoord('G54')">G54</span>
+      <span class="cb-opt" id="cb-mach" onclick="setCoord('MACH')">MACH</span>
+    </div>
+  </div>
+  <div class="sb-item" id="sb-mat-info" style="color:var(--orange);font-size:11px"></div>
+  <div id="sb-spc"></div>
+  <div class="sb-item"><span id="sb-cnt" style="color:var(--text3)">0 kom</span></div>
+  <span id="sb-time" style="font-size:12px;color:var(--text3)">00:00</span>
+  <div id="sb-menu" onclick="toggleMenu()">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+    </svg>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+
+  <!-- LEFT: OPERATOR PANEL -->
+  <div id="panel-run">
+    <!-- Position display -->
+    <div class="pos-block">
+      <span class="pos-label" id="pos-label">POZICIJA</span>
+      <div>
+        <span class="pos-work" id="pos-work">0.00</span>
+        <span class="pos-unit"> mm</span>
+      </div>
+      <div class="pos-machine" id="pos-mach-row">
+        Machine: <span id="pos-mach">400.00</span> mm &nbsp;·&nbsp;
+        G54 offset: <span id="pos-offset">400.00</span> mm
+      </div>
+      <div class="pos-comp" id="pos-comp" style="display:none"></div>
+    </div>
+
+    <!-- Target input -->
+    <div class="tgt-block">
+      <span class="tgt-lbl">CILJ</span>
+      <span class="tgt-val" id="tgt-val"
+        onclick="openNP('target','Ciljna pozicija (mm)',S.target,0,500,0.1)">100.0</span>
+      <span class="tgt-unit">mm</span>
+      <div class="tgt-adj">
+        <button class="tadj" onclick="adjTgt(1)">▲</button>
+        <button class="tadj" onclick="adjTgt(-1)">▼</button>
+      </div>
+    </div>
+
+    <!-- Fine adj -->
+    <div class="adj-btns">
+      <button class="adv" onclick="adjTgt(-10)">−10</button>
+      <button class="adv" onclick="adjTgt(-1)">−1</button>
+      <button class="adv" onclick="adjTgt(-0.1)">−0.1</button>
+      <button class="adv p" onclick="adjTgt(0.1)">+0.1</button>
+      <button class="adv p" onclick="adjTgt(1)">+1</button>
+      <button class="adv p" onclick="adjTgt(10)">+10</button>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="act-btns">
+      <button class="abtn a-go" onclick="cmdGo()">▶&nbsp;GO</button>
+      <button class="abtn a-home" style="flex:.6" onclick="cmdHome()">⌂ HOME</button>
+      <button class="abtn a-stop" style="flex:.7" onclick="cmdStop()">■ STOP</button>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div id="panel-right">
+    <div id="rtabs">
+      <div class="rtab active" id="tab-info"     onclick="showTab('info')">INFO</div>
+      <div class="rtab"        id="tab-prog"     onclick="showTab('prog')">PROGRAMI</div>
+      <div class="rtab"        id="tab-manual"   onclick="showTab('manual')">RUČNO</div>
+      <div class="rtab"        id="tab-settings" onclick="showTab('settings')">SETT.</div>
+    </div>
+    <div id="rtabcontent">
+
+      <!-- INFO TAB -->
+      <div id="tc-info">
+        <div class="icard">
+          <div class="ic-row"><span class="ic-lbl">Status</span><span class="ic-val" id="ic-status">NOT HOMED</span></div>
+          <div class="ic-row"><span class="ic-lbl">Program</span><span class="ic-val" id="ic-prog">—</span></div>
+          <div class="ic-row"><span class="ic-lbl">Korak</span><span class="ic-val" id="ic-step">—</span></div>
+          <div class="ic-row"><span class="ic-lbl">Materijal</span><span class="ic-val" id="ic-mat">—</span></div>
+          <div class="ic-row"><span class="ic-lbl">Debljina</span><span class="ic-val" id="ic-thick">—</span></div>
+          <div class="ic-row"><span class="ic-lbl">Kompenzacija</span><span class="ic-val" id="ic-comp">0.000 mm</span></div>
+        </div>
+        <div class="icard">
+          <div class="ic-row"><span class="ic-lbl">Ukupno komada</span><span class="ic-val" id="ic-cnt">0</span></div>
+          <div class="ic-row"><span class="ic-lbl">Batch</span><span class="ic-val" id="ic-batch">—</span></div>
+          <div class="ic-row"><span class="ic-lbl">Firmware</span><span class="ic-val">1.0.0</span></div>
+        </div>
+        <!-- Quick mat/thickness -->
+        <div style="display:flex;gap:6px;margin-top:2px">
+          <div style="flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:8px;
+            padding:8px 10px;cursor:pointer" onclick="showTab('settings')">
+            <div style="font-size:10px;color:var(--text2);text-transform:uppercase">Materijal</div>
+            <div id="q-mat" style="font-weight:700;font-size:13px;color:#60a5fa;margin-top:2px">Čelik S235</div>
+          </div>
+          <div style="flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:8px;
+            padding:8px 10px;cursor:pointer"
+            onclick="openNP('thickness','Debljina lima (mm)',S.thickness,0.5,20,0.5)">
+            <div style="font-size:10px;color:var(--text2);text-transform:uppercase">Debljina</div>
+            <div id="q-thick" style="font-weight:700;font-size:13px;color:#fb923c;margin-top:2px">2.0 mm</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROGRAMS TAB -->
+      <div id="tc-prog" style="display:none">
+        <div style="display:flex;gap:6px;margin-bottom:8px">
+          <button style="flex:1;height:30px;background:var(--green);border:none;border-radius:7px;
+            color:#fff;font-weight:700;font-size:12px;cursor:pointer" onclick="newProg()">+ NOVI PROGRAM</button>
+          <button style="height:30px;padding:0 12px;background:var(--bg3);border:1px solid var(--border);
+            border-radius:7px;color:var(--text3);font-weight:700;font-size:11px;cursor:pointer"
+            onclick="savePosAsProg()">📍 SAČUVAJ POS.</button>
+        </div>
+        <div id="prog-list"></div>
+      </div>
+
+      <!-- MANUAL TAB -->
+      <div id="tc-manual" style="display:none">
+        <div class="jog-row">
+          <button class="jbig" onmousedown="jog(-1)" onmouseup="stopJog()">◀</button>
+          <div class="jmid">
+            <div style="font-size:10px;color:var(--text2);text-transform:uppercase">Pozicija</div>
+            <span class="jpos" id="jog-pos">0.00</span>
+            <span style="font-size:12px;color:var(--text2)"> mm</span>
+          </div>
+          <button class="jbig" onmousedown="jog(1)" onmouseup="stopJog()">▶</button>
+        </div>
+        <div class="step-row" style="margin-bottom:10px">
+          <button class="sb2" onclick="setStep(10)">10</button>
+          <button class="sb2 on" onclick="setStep(1)">1</button>
+          <button class="sb2" onclick="setStep(0.1)">0.1</button>
+          <button class="sb2" onclick="setStep(0.01)">0.01</button>
+        </div>
+        <div style="display:flex;gap:6px">
+          <div style="flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px 10px">
+            <div style="font-size:10px;color:var(--text2)">IDI NA (mm)</div>
+            <div id="gt-val" style="font-size:20px;font-weight:800;color:var(--blue);cursor:pointer"
+              onclick="openNP('goto','Pozicija (mm)',S.target,0,500,0.01)">100.00</div>
+          </div>
+          <button style="padding:0 14px;background:var(--green);border:none;border-radius:8px;
+            color:#fff;font-weight:800;cursor:pointer" onclick="cmdGoTo()">IDI ▶</button>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button style="flex:1;height:34px;background:var(--bg3);border:1px solid var(--border);
+            border-radius:7px;color:var(--text3);font-weight:700;font-size:12px;cursor:pointer"
+            onclick="openNP('g54','G54 Offset (mm)',S.g54offset,0,1000,0.01)">
+            ⊙ G54: <span id="g54-disp" style="color:#60a5fa">400.00</span> mm</button>
+          <button style="height:34px;padding:0 12px;background:var(--bg3);border:1px solid var(--border);
+            border-radius:7px;color:var(--text3);font-weight:700;font-size:11px;cursor:pointer"
+            onclick="setZeroHere()">SET ZERO</button>
+        </div>
+      </div>
+
+      <!-- SETTINGS TAB -->
+      <div id="tc-settings" style="display:none">
+        <div id="set-list"></div>
+        <div style="margin-top:8px;font-size:10px;font-weight:700;color:var(--text2);
+          text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">MATERIJALI</div>
+        <div id="mat-quick"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- MENU PANEL -->
+<div id="menu-overlay" onclick="closeMenu()"></div>
+<div id="menu-panel">
+  <div class="menu-header">
+    <span>MENI</span>
+    <span style="cursor:pointer;color:var(--text3);font-size:18px" onclick="closeMenu()">✕</span>
+  </div>
+  <div class="menu-item" onclick="closeMenu();cmdHome()">
+    <div class="menu-icon mi-orange">⌂</div>HOMING
+  </div>
+  <div class="menu-item" onclick="closeMenu();showProgModal()">
+    <div class="menu-icon mi-blue">≡</div>UREDI PROGRAME
+  </div>
+  <div class="menu-item" onclick="closeMenu();openNP('g54','G54 Offset — rastojanje od home switcha do centra savijanja (mm)',S.g54offset,0,1000,0.1)">
+    <div class="menu-icon mi-green">⊙</div>G54 OFFSET (KALIBRACIJA)
+  </div>
+  <div class="menu-item" onclick="closeMenu();openNP('batch','Veličina serije',S.batchSet,1,9999,1)">
+    <div class="menu-icon mi-gray">🔢</div>BATCH SERIJA
+  </div>
+  <div class="menu-item" onclick="closeMenu();resetCount()">
+    <div class="menu-icon mi-gray">↩</div>RESET BROJAČA
+  </div>
+  <div class="menu-sep"></div>
+  <div class="menu-item" onclick="closeMenu();showTab('settings')">
+    <div class="menu-icon mi-gray">⚙</div>PODEŠAVANJA
+  </div>
+  <div class="menu-version">Back Gauge Control v1.0.0 · ESP32-S3</div>
+</div>
+
+<!-- HOMING OVERLAY -->
+<div id="hom-ovl">
+  <div class="hom-title" id="hom-txt">HOMING U TOKU...</div>
+  <div style="font-size:12px;color:var(--text2)">Molimo sačekajte</div>
+  <div class="hom-bar-bg"><div class="hom-bar-fill" id="hom-bar" style="width:0%"></div></div>
+  <div class="hom-pct" id="hom-pct">0%</div>
+  <button style="height:40px;padding:0 28px;background:var(--red);border:none;border-radius:8px;
+    color:#fff;font-weight:800;cursor:pointer" onclick="cancelHome()">■ STOP</button>
+</div>
+
+<!-- PROGRAM EDIT MODAL -->
+<div id="prog-modal">
+  <div class="pm-card">
+    <div class="pm-hdr">
+      <input id="pm-name" placeholder="Naziv programa"
+        oninput="S.editProg&&(S.editProg.name=this.value,saveLS())">
+      <button class="pi-load" onclick="addStep()" style="white-space:nowrap">+ KORAK</button>
+      <button style="height:28px;padding:0 10px;background:var(--bg4);border:1px solid var(--border);
+        border-radius:6px;color:var(--text3);cursor:pointer;font-size:12px"
+        onclick="closePM()">✕</button>
+    </div>
+    <div class="pm-body" id="pm-steps"></div>
+    <div class="pm-ftr">
+      <button style="flex:1;height:34px;background:var(--green);border:none;border-radius:7px;
+        color:#fff;font-weight:700;cursor:pointer" onclick="savePM()">SAČUVAJ</button>
+      <button style="height:34px;padding:0 14px;background:var(--bg3);border:1px solid var(--border);
+        border-radius:7px;color:var(--text3);font-weight:700;cursor:pointer"
+        onclick="loadCurrentProg()">▶ POKRENI</button>
+    </div>
+  </div>
+</div>
+
+<!-- NUMPAD -->
+<div id="np">
+  <div class="npc">
+    <div class="np-lbl" id="np-lbl">Unesite vrijednost</div>
+    <div class="np-disp" id="np-disp">0</div>
+    <div class="npg">
+      <button class="nk" onclick="npk('7')">7</button>
+      <button class="nk" onclick="npk('8')">8</button>
+      <button class="nk" onclick="npk('9')">9</button>
+      <button class="nk" onclick="npk('4')">4</button>
+      <button class="nk" onclick="npk('5')">5</button>
+      <button class="nk" onclick="npk('6')">6</button>
+      <button class="nk" onclick="npk('1')">1</button>
+      <button class="nk" onclick="npk('2')">2</button>
+      <button class="nk" onclick="npk('3')">3</button>
+      <button class="nk nk-no" onclick="npCancel()">✕</button>
+      <button class="nk" onclick="npk('0')">0</button>
+      <button class="nk nk-del" onclick="npBS()">⌫</button>
+      <button class="nk" onclick="npk('.')">.</button>
+      <button class="nk" onclick="npk('-')">±</button>
+      <button class="nk nk-ok" onclick="npOK()">✓</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════ STATE ═══════════════════════
+const S = {
+  machPos: 400.0,   // fizička pozicija od home switcha
+  g54offset: 400.0, // Machine coord kad je Work=0 (centar savijanja)
+  target: 100.0,    // Work target
+  status: 'NOT_HOMED',
+  isHomed: false,
+  isMoving: false,
+  coordMode: 'G54',
+  jogStep: 1.0,
+  matIdx: 0,
+  thickness: 2.0,
+  count: 0,
+  batchSet: 0,
+  currentProg: null,
+  currentStep: 0,
+  editProg: null,
+  hTimer: null,
+  hPct: 0,
+  materials: [
+    {name:'Čelik S235',comps:[{t:1.0,c:0.05},{t:1.5,c:0.07},{t:2.0,c:0.08},{t:3.0,c:0.12},{t:5.0,c:0.18}]},
+    {name:'Inox 304',  comps:[{t:1.0,c:0.08},{t:1.5,c:0.11},{t:2.0,c:0.13},{t:3.0,c:0.20},{t:5.0,c:0.30}]},
+    {name:'Aluminij',  comps:[{t:1.0,c:-0.03},{t:1.5,c:-0.04},{t:2.0,c:-0.05},{t:3.0,c:-0.08},{t:5.0,c:-0.12}]},
+  ],
+  programs: [],
+  settings: {
+    maxSpeed:150, acc:150, dec:150,
+    backlash:3.0, softLimit:400.0, retract:50.0,
+  },
+};
+
+// persist
+try{const p=localStorage.getItem('bg2_p');if(p)S.programs=JSON.parse(p);}catch(e){}
+try{const s=localStorage.getItem('bg2_s');if(s)Object.assign(S.settings,JSON.parse(s));}catch(e){}
+try{const m=localStorage.getItem('bg2_m');if(m)S.materials=JSON.parse(m);}catch(e){}
+try{const g=localStorage.getItem('bg2_g54');if(g)S.g54offset=parseFloat(g);}catch(e){}
+
+function saveLS(){
+  localStorage.setItem('bg2_p',JSON.stringify(S.programs));
+  localStorage.setItem('bg2_s',JSON.stringify(S.settings));
+  localStorage.setItem('bg2_m',JSON.stringify(S.materials));
+  localStorage.setItem('bg2_g54',S.g54offset);
+}
+
+// ══ Coordinate helpers ══
+function workPos(){ return S.g54offset - S.machPos; }  // Work = offset - machine (veci = dalje)
+function machFromWork(w){ return S.g54offset - w; }    // Machine = offset - work
+
+// ══ Compensation ══
+function getComp(){
+  const mat=S.materials[S.matIdx];
+  if(!mat||!mat.comps.length) return 0;
+  const cs=[...mat.comps].sort((a,b)=>a.t-b.t);
+  for(let i=0;i<cs.length-1;i++){
+    if(S.thickness>=cs[i].t&&S.thickness<=cs[i+1].t){
+      const f=(S.thickness-cs[i].t)/(cs[i+1].t-cs[i].t);
+      return cs[i].c+f*(cs[i+1].c-cs[i].c);
+    }
+  }
+  let best=cs[0],bd=999;
+  for(const c of cs){const d=Math.abs(c.t-S.thickness);if(d<bd){bd=d;best=c;}}
+  return best.c;
+}
+
+// ═══════════════════════ MOTOR SIM ═══════════════════════
+setInterval(()=>{
+  if(!S.isMoving) return;
+  const diff=S._targetMach-S.machPos;
+  const spd=0.8;
+  if(Math.abs(diff)<0.02){
+    S.machPos=S._targetMach; S.isMoving=false;
+    setStatus(S.isHomed?'READY':'NOT_HOMED');
+    if(S.isHomed&&S.autoCount){S.count++;updateInfoUI();}
+  } else { S.machPos+=Math.sign(diff)*Math.min(spd,Math.abs(diff)); }
+  updatePosUI();
+},30);
+
+function moveMach(machMm){
+  const lim=machFromWork(0); // ne idi dalje od work=0
+  const clamped=Math.max(0,Math.min(9999,machMm));
+  S._targetMach=clamped; S.isMoving=true; setStatus('MOVING');
+}
+
+// ═══════════════════════ COMMANDS ═══════════════════════
+function cmdGo(){
+  if(!S.isHomed){alert('Uradi homing prvo!');return;}
+  const comp=getComp();
+  const machTarget=machFromWork(S.target-comp);
+  const ce=document.getElementById('pos-comp');
+  if(comp!==0){
+    ce.style.display='';
+    ce.textContent='Komp '+(comp>=0?'+':'')+comp.toFixed(3)+'mm → '+(S.target-comp).toFixed(3)+'mm prikazano';
+  } else { ce.style.display='none'; }
+  moveMach(machTarget);
+  S.autoCount=true;
+}
+function cmdGoTo(){if(!S.isHomed){alert('Uradi homing prvo!');return;} S.autoCount=false; moveMach(machFromWork(S.target));}
+function cmdStop(){
+  S.isMoving=false; if(S._targetMach!==undefined)S._targetMach=S.machPos;
+  if(S.hTimer){clearInterval(S.hTimer);S.hTimer=null;document.getElementById('hom-ovl').classList.remove('on');}
+  setStatus(S.isHomed?'READY':'NOT_HOMED');
+}
+function cmdHome(){
+  document.getElementById('hom-ovl').classList.add('on');
+  S.hPct=0; S.isHomed=false; setStatus('HOMING');
+  document.getElementById('hom-txt').textContent='HOMING U TOKU...';
+  document.getElementById('hom-txt').style.color='var(--orange)';
+  document.getElementById('hom-bar').style.background='var(--blue)';
+  S.hTimer=setInterval(()=>{
+    S.hPct+=2;
+    document.getElementById('hom-bar').style.width=S.hPct+'%';
+    document.getElementById('hom-pct').textContent=S.hPct+'%';
+    if(S.hPct>=100){
+      clearInterval(S.hTimer);S.hTimer=null;
+      S.machPos=0; S._targetMach=0; S.isHomed=true; setStatus('READY');
+      document.getElementById('hom-txt').textContent='✓ ZAVRŠEN';
+      document.getElementById('hom-txt').style.color='var(--green)';
+      document.getElementById('hom-bar').style.background='var(--green)';
+      updatePosUI();
+      setTimeout(()=>document.getElementById('hom-ovl').classList.remove('on'),1200);
+    }
+  },80);
+}
+function cancelHome(){cmdStop();}
+function setZeroHere(){ S.g54offset=S.machPos; saveLS(); updatePosUI(); }
+function jog(dir){ if(!S.isHomed) return; S.autoCount=false; moveMach(S.machPos-dir*S.jogStep); }
+function stopJog(){}
+function adjTgt(d){
+  S.target=Math.max(0,Math.min(S.settings.softLimit,Math.round((S.target+d)*10)/10));
+  updateTgtUI();
+}
+function resetCount(){ S.count=0; updateInfoUI(); }
+
+// ═══════════════════════ UI UPDATE ═══════════════════════
+function updatePosUI(){
+  const work=workPos();
+  const disp = S.coordMode==='G54' ? work : S.machPos;
+  document.getElementById('pos-work').textContent = disp.toFixed(2);
+  document.getElementById('pos-mach').textContent = S.machPos.toFixed(2);
+  document.getElementById('pos-offset').textContent = S.g54offset.toFixed(2);
+  document.getElementById('jog-pos').textContent = work.toFixed(2);
+  document.getElementById('sb-cnt').textContent = S.count+' kom';
+}
+function updateTgtUI(){
+  document.getElementById('tgt-val').textContent = S.target.toFixed(1);
+  document.getElementById('gt-val').textContent  = S.target.toFixed(2);
+}
+function setStatus(st){
+  S.status=st;
+  const MAP={
+    'NOT_HOMED':['NOT HOMED','p-nohome'],
+    'READY':    ['READY',    'p-ready'],
+    'MOVING':   ['MOVING',   'p-moving'],
+    'HOMING':   ['HOMING',   'p-homing'],
+    'ERROR':    ['ERROR',    'p-error'],
+  };
+  const [t,c]=MAP[st]||['—','p-nohome'];
+  const el=document.getElementById('sb-badge');
+  el.textContent=t; el.className='pill '+c;
+  document.getElementById('ic-status').textContent=t;
+}
+function updateInfoUI(){
+  const mat=S.materials[S.matIdx];
+  const comp=getComp();
+  document.getElementById('ic-mat').textContent=mat?mat.name:'—';
+  document.getElementById('ic-thick').textContent=S.thickness.toFixed(1)+' mm';
+  document.getElementById('ic-comp').textContent=(comp>=0?'+':'')+comp.toFixed(3)+' mm';
+  document.getElementById('ic-cnt').textContent=S.count;
+  document.getElementById('ic-batch').textContent=S.batchSet?S.batchSet+' ('+Math.max(0,S.batchSet-S.count)+' ostalo)':'—';
+  document.getElementById('q-mat').textContent=mat?mat.name:'—';
+  document.getElementById('q-thick').textContent=S.thickness.toFixed(1)+' mm';
+  const si=S.currentProg?S.currentProg.name:'—';
+  document.getElementById('ic-prog').textContent=si;
+  document.getElementById('ic-step').textContent=S.currentProg?(S.currentStep+1)+'/'+S.currentProg.steps.length:'—';
+  document.getElementById('sb-mat-info').textContent=
+    (mat?mat.name:'')+(comp!==0?' '+(comp>=0?'+':'')+comp.toFixed(3)+'mm':'');
+  document.getElementById('g54-disp').textContent=S.g54offset.toFixed(2);
+}
+
+// ═══════════════════════ COORD MODE ═══════════════════════
+function setCoord(m){
+  S.coordMode=m;
+  document.getElementById('cb-g54').classList.toggle('on',m==='G54');
+  document.getElementById('cb-mach').classList.toggle('on',m==='MACH');
+  document.getElementById('pos-label').textContent = m==='G54'?'POZICIJA (Work G54)':'POZICIJA (Machine)';
+  updatePosUI();
+}
+
+// ═══════════════════════ PROGRAMS ═══════════════════════
+function renderProgs(){
+  const el=document.getElementById('prog-list');
+  if(!S.programs.length){
+    el.innerHTML='<div style="color:var(--text2);text-align:center;padding:24px;font-size:12px">Nema programa</div>';
+    return;
+  }
+  el.innerHTML=S.programs.map((p,i)=>`
+    <div class="prog-item ${S.currentProg===p?'loaded':''}">
+      <span class="pi-num">${i+1}</span>
+      <div style="flex:1"><div class="pi-name">${p.name}</div>
+        <div class="pi-info">${p.steps.length} koraka · ${p.steps.map(s=>s.pos.toFixed(1)).join(', ')} mm</div>
+      </div>
+      <button class="pi-load" onclick="loadProg(${i})">▶ LOAD</button>
+      <button style="height:26px;padding:0 7px;background:var(--bg4);border:1px solid var(--border);
+        border-radius:5px;color:var(--text3);cursor:pointer;font-size:11px;margin-left:4px"
+        onclick="openPMforIdx(${i})">✏</button>
+    </div>`).join('');
+}
+function newProg(){
+  const p={name:'Program '+(S.programs.length+1),steps:[]};
+  S.programs.push(p); saveLS(); S.editProg=p; openPM();
+}
+function showProgModal(){ renderProgs(); showTab('prog'); }
+function loadProg(i){S.currentProg=S.programs[i];S.currentStep=0;updateInfoUI();renderProgs();}
+function savePosAsProg(){
+  const w=workPos();
+  S.programs.push({name:'Pos '+w.toFixed(1)+'mm',steps:[{pos:w,count:1}]});
+  saveLS(); renderProgs();
+}
+function openPMforIdx(i){ S.editProg=S.programs[i]; openPM(); }
+function openPM(){ document.getElementById('pm-name').value=S.editProg?S.editProg.name:''; renderPMSteps(); document.getElementById('prog-modal').classList.add('on'); }
+function closePM(){ document.getElementById('prog-modal').classList.remove('on'); renderProgs(); }
+function savePM(){ saveLS(); closePM(); }
+function loadCurrentProg(){ if(S.editProg){S.currentProg=S.editProg;S.currentStep=0;} closePM(); updateInfoUI(); }
+function addStep(){ if(!S.editProg) return; S.editProg.steps.push({pos:S.target,count:1}); saveLS(); renderPMSteps(); }
+function renderPMSteps(){
+  const el=document.getElementById('pm-steps');
+  if(!S.editProg||!S.editProg.steps.length){
+    el.innerHTML='<div style="color:var(--text2);text-align:center;padding:16px;font-size:12px">Nema koraka. Pritisnite + KORAK.</div>';
+    return;
+  }
+  el.innerHTML=S.editProg.steps.map((s,i)=>`
+    <div class="pm-step">
+      <span class="pm-lbl">${i+1}.</span>
+      <span class="pm-pos" onclick="openNP('ep${i}','Pozicija koraka ${i+1} (mm)',${s.pos},0,500,0.01)">${s.pos.toFixed(2)} mm</span>
+      <span style="color:var(--text2);font-size:12px">×</span>
+      <span class="pm-cnt" onclick="openNP('ec${i}','Komada',${s.count},1,9999,1)">${s.count} kom</span>
+      <button class="pm-del" onclick="delStep(${i})">✕</button>
+    </div>`).join('');
+}
+function delStep(i){ S.editProg.steps.splice(i,1); saveLS(); renderPMSteps(); }
+
+// ═══════════════════════ SETTINGS ═══════════════════════
+const SDEFS=[
+  {k:'maxSpeed',l:'Max brzina',u:'mm/s',min:5,max:300,step:5},
+  {k:'acc',l:'Ubrzanje',u:'mm/s²',min:20,max:600,step:10},
+  {k:'dec',l:'Usporenje',u:'mm/s²',min:20,max:600,step:10},
+  {k:'backlash',l:'Backlash komp.',u:'mm',min:0,max:10,step:0.1},
+  {k:'softLimit',l:'Soft limit',u:'mm',min:50,max:600,step:10},
+  {k:'retract',l:'Retract hod',u:'mm',min:5,max:150,step:5},
+];
+function renderSettings(){
+  document.getElementById('set-list').innerHTML=SDEFS.map(d=>`
+    <div class="set-row" onclick="openNP('S_${d.k}','${d.l}',${S.settings[d.k]},${d.min},${d.max},${d.step})">
+      <span class="sr-lbl">${d.l}</span>
+      <span class="sr-val" id="sv-${d.k}">${S.settings[d.k]}</span>
+      <span class="sr-unit">${d.u} ›</span>
+    </div>`).join('');
+  const mq=document.getElementById('mat-quick');
+  mq.innerHTML=S.materials.map((m,i)=>`
+    <div style="display:flex;align-items:center;padding:6px 10px;background:${S.matIdx===i?'#0d1f14':
+      'var(--bg2)'};border:1px solid ${S.matIdx===i?'var(--green)':'var(--border)'};
+      border-radius:7px;margin-bottom:4px;cursor:pointer" onclick="selMat(${i})">
+      <span style="flex:1;font-size:12px;font-weight:700">${m.name}</span>
+      <span style="font-size:10px;color:var(--text2)">${m.comps.length} debljina</span>
+    </div>`).join('');
+}
+function selMat(i){ S.matIdx=i; updateInfoUI(); renderSettings(); }
+function updSetting(k,v){ S.settings[k]=v; saveLS(); const e=document.getElementById('sv-'+k); if(e)e.textContent=v; }
+
+// ═══════════════════════ TABS ═══════════════════════
+function showTab(t){
+  ['info','prog','manual','settings'].forEach(x=>{
+    document.getElementById('tc-'+x).style.display=x===t?'':'none';
+    document.getElementById('tab-'+x).classList.toggle('active',x===t);
+  });
+  if(t==='prog') renderProgs();
+  if(t==='settings') renderSettings();
+}
+
+// ═══════════════════════ MENU ═══════════════════════
+function toggleMenu(){
+  document.getElementById('menu-panel').classList.toggle('open');
+  document.getElementById('menu-overlay').classList.toggle('open');
+}
+function closeMenu(){
+  document.getElementById('menu-panel').classList.remove('open');
+  document.getElementById('menu-overlay').classList.remove('open');
+}
+
+// ═══════════════════════ JOG ═══════════════════════
+function setStep(v){
+  S.jogStep=v;
+  document.querySelectorAll('.sb2').forEach(b=>b.classList.toggle('on',b.textContent==v));
+}
+
+// ═══════════════════════ NUMPAD ═══════════════════════
+let NP={f:'',min:0,max:9999,step:1,v:''};
+function openNP(f,lbl,cur,min,max,step){
+  NP={f,min,max,step,v:String(cur)};
+  document.getElementById('np-lbl').textContent=lbl;
+  document.getElementById('np-disp').textContent=cur;
+  document.getElementById('np').classList.add('on');
+}
+function npk(k){
+  if(k==='-'){NP.v=NP.v.startsWith('-')?NP.v.slice(1):'-'+NP.v;}
+  else if(k==='.'&&NP.v.includes('.')) return;
+  else {NP.v=(NP.v==='0'||NP.v==='')?k:NP.v+k;}
+  document.getElementById('np-disp').textContent=NP.v;
+}
+function npBS(){NP.v=NP.v.length>1?NP.v.slice(0,-1):'0';document.getElementById('np-disp').textContent=NP.v;}
+function npCancel(){document.getElementById('np').classList.remove('on');}
+function npOK(){
+  let v=parseFloat(NP.v); if(isNaN(v)){npCancel();return;}
+  v=Math.max(NP.min,Math.min(NP.max,Math.round(v/NP.step)*NP.step));
+  v=parseFloat(v.toFixed(6));
+  const f=NP.f;
+  if(f==='target'||f==='goto'){S.target=v;updateTgtUI();}
+  else if(f==='thickness'){S.thickness=v;updateInfoUI();}
+  else if(f==='g54'){S.g54offset=v;saveLS();updatePosUI();document.getElementById('g54-disp').textContent=v.toFixed(2);}
+  else if(f==='batch'){S.batchSet=Math.round(v);updateInfoUI();}
+  else if(f.startsWith('S_')){updSetting(f.slice(2),v);}
+  else if(f.startsWith('ep')){const i=parseInt(f.slice(2));if(S.editProg){S.editProg.steps[i].pos=v;saveLS();renderPMSteps();}}
+  else if(f.startsWith('ec')){const i=parseInt(f.slice(2));if(S.editProg){S.editProg.steps[i].count=Math.round(v);saveLS();renderPMSteps();}}
+  npCancel();
+}
+document.addEventListener('keydown',e=>{
+  if(!document.getElementById('np').classList.contains('on')) return;
+  if(e.key>='0'&&e.key<='9') npk(e.key);
+  else if(e.key==='.') npk('.');
+  else if(e.key==='-') npk('-');
+  else if(e.key==='Backspace') npBS();
+  else if(e.key==='Enter') npOK();
+  else if(e.key==='Escape') npCancel();
+});
+
+// ═══════════════════════ CLOCK ═══════════════════════
+setInterval(()=>{
+  const d=new Date(),p=n=>String(n).padStart(2,'0');
+  document.getElementById('sb-time').textContent=p(d.getHours())+':'+p(d.getMinutes());
+},1000);
+
+// ═══════════════════════ INIT ═══════════════════════
+updatePosUI();
+updateTgtUI();
+updateInfoUI();
+setStatus('NOT_HOMED');
+</script>
+</body>
+</html>
