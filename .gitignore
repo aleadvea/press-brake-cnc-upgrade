@@ -25,6 +25,10 @@ Desktop.ini
 *.gif
 *.webp
 *.avif
+!docs/images/**
+
+# Keep random local snapshots out of repo root
+Untitled.jpg
 
 # Python/cache artifacts if they appear
 __pycache__/
