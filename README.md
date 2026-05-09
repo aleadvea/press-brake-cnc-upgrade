@@ -1,4 +1,4 @@
-# CNC Press Brake Back-Gauge Upgrade (Dual ESP32)
+﻿# CNC Press Brake Back-Gauge Upgrade (Dual ESP32)
 
 End-to-end embedded control system for a CNC press brake back-gauge, built as a real hardware project and portfolio showcase.
 
@@ -179,7 +179,17 @@ pio run -t upload --upload-port COM5   # motor_test
 
 Working prototype tested on real hardware, with ongoing iterative improvements for production robustness and operator UX.
 
-## 14. Author
+## 14. License
 
-Aleksandar Zdravkovic  
-Embedded/automation practical portfolio project focused on CNC manufacturing applications.
+MIT — see [LICENSE](LICENSE).
+
+## 15. Author
+
+**Aleksandar Zdravković**  
+Embedded / industrial automation, CNC manufacturing focus · Serbia  
+✉ [aleksandar@advea.rs](mailto:aleksandar@advea.rs)  
+🐙 [github.com/aleadvea](https://github.com/aleadvea)
+
+**Related portfolio repos:**
+- [cnc-mtconnect-erp-bridge](https://github.com/aleadvea/ERPNEXT-shopfloor-integration) — Raspberry Pi edge node bridging FANUC MTConnect + ESP32 MQTT data into ERPNext
+- [weld-production-analyzer](https://github.com/aleadvea/weld-production-analyzer) — Flask tool for Kemppi ArcInfo XML production reports
