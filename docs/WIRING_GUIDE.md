@@ -28,12 +28,14 @@ Result:
 
 ## 4. ESP32 Motor Node (`motor_brain`)
 
-Main pins:
+Main pins (from firmware):
 
-- `GPIO18` -> `PUL-`
-- `GPIO19` -> `DIR-`
-- `GPIO21` -> (not used for active ENA control in current safe setup)
-- `GPIO22` -> HOME sensor input (`INPUT_PULLUP`, active LOW)
+- `GPIO18` -> `PUL-` (step pulse)
+- `GPIO19` -> `DIR-` (direction)
+- `GPIO21` -> `ENA-` (defined, but motion stop safety is done via hardware E-STOP on `PUL+`)
+- `GPIO22` -> HOME input (`INPUT_PULLUP`, active HIGH in current NC wiring)
+- `GPIO23` -> BEND input (`INPUT_PULLUP`, HIGH = bend contact open)
+- `GPIO34` -> Driver `ALM+` input (input-only pin, external pull-up required, LOW = driver alarm)
 
 See project source comments and firmware logic in:
 
@@ -46,20 +48,26 @@ Encoder wiring is connected directly to driver encoder terminals (`VCC`, `EGND`,
 
 Do not feed encoder from random external rail unless required by your exact driver model.
 
-## 6. Inductive Sensors Through Optocoupler Board
+## 6. Limit Switches Through Optocoupler Board
 
-Sensors are 24V side, ESP is 3.3V side.
+Both HOME (zero position) and BEND signals use mechanical limit switches routed through an optocoupler board to protect the 3.3V ESP inputs.
 
 Typical approach used here:
 
-- Sensor side to optocoupler input (`INx`, `G`)
+- Switch side to optocoupler input (`INx`, `G`)
 - ESP side reads optocoupler output (`Vx`) with pull-up logic
-- Active detection interpreted as LOW in firmware
+- HOME/BEND are read with `INPUT_PULLUP`; current machine setup is treated as active HIGH in firmware (NC switch: contact opens when triggered)
+- Driver ALM is active LOW (`LOW = alarm`, `HIGH = ok`)
+
+Important:
+
+- Keep HOME and BEND electrical polarity exactly as tested on the prototype unless you also adjust firmware logic.
+- If you invert sensor logic in hardware, update firmware checks before first motion test.
 
 Recommended HMI/motor validation:
 
-1. Check HOME sensor transitions.
-2. Check BEND sensor transitions.
+1. Check HOME limit switch transitions.
+2. Check BEND limit switch transitions.
 3. Confirm alarm input behavior.
 
 ## 7. Communication and Dual-Node Link

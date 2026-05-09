@@ -91,10 +91,10 @@ Communication between nodes is done via ESP-NOW.
   - LVGL screens, storage, ESP-NOW HMI side, UI workflow logic
 
 - `docs/`
-  - `WIRING_GUIDE.md` (clean wiring guide for replication)
+  - `WIRING_GUIDE.md` (wiring guide)
   - `WIRING_GUIDE_LEGACY.txt` (original field notes)
   - `hmi/hmi_v2.html` (HMI prototype view)
-  - `images/servo-stepper-12-5nm-2.avif` (hardware image)
+  - `images/` (hardware and bench photos)
 
 ## 6. Documentation for Replication
 
@@ -102,19 +102,8 @@ If someone wants to build the same setup, start here:
 
 1. `docs/WIRING_GUIDE.md`
 2. `docs/WIRING_GUIDE_LEGACY.txt`
-3. `README.md` sections 7 and 8
 
-## 7. Visuals
-
-Hardware image:
-
-![Stepper motor](docs/images/servo-stepper-12-5nm-2.avif)
-
-HMI concept file:
-
-- `docs/hmi/hmi_v2.html`
-
-## 8. Hardware Stack
+## 7. Hardware Stack
 
 | Component | Details |
 |---|---|
@@ -122,13 +111,12 @@ HMI concept file:
 | HMI MCU | Waveshare ESP32-S3 Touch LCD 7 (800×480, capacitive touch) |
 | Motor | Nema23 closed-loop stepper (step-servo, 12.5 Nm) |
 | Motor driver | Step Servo Drive (step/dir input, AC/DC 20-50V) |
-| Home sensor | Inductive proximity sensor via optocoupler |
-| End limit sensor | Inductive proximity sensor via optocoupler |
-| Bend sensor | Foot pedal or contact signal via optocoupler |
+| Home (zero) switch | Mechanical limit switch via optocoupler |
+| Bend sensor | Mechanical limit switch triggered by press beam, via optocoupler |
 | Power supply | 24V DC switching supply for logic; driver powered separately |
 | Emergency stop | Hardware wired directly to driver enable — independent of firmware |
 
-## 9. Key Technical Decisions
+## 8. Key Technical Decisions
 
 **Why dual ESP32 nodes instead of one?**  
 Separating motor control from HMI keeps real-time step generation isolated from UI rendering. LVGL screen redraws and touch events must not interfere with stepper pulse timing.
@@ -142,7 +130,7 @@ The operator workflow required custom screen layouts, a numpad, alarm views, and
 **Why LittleFS for persistence?**  
 Machine settings, materials, and programs must survive power cycles. LittleFS on the HMI node provides a simple, reliable key-value JSON store without external EEPROM hardware.
 
-## 10. Build and Flash
+## 9. Build and Flash
 
 Prerequisites:
 
@@ -162,7 +150,7 @@ pio run -t upload --upload-port COM3   # motor_brain
 pio run -t upload --upload-port COM5   # motor_test
 ```
 
-## 11. Quick Bring-Up Checklist
+## 10. Quick Bring-Up Checklist
 
 1. Flash `motor_brain` first.
 2. Flash `motor_test` second.
@@ -172,9 +160,7 @@ pio run -t upload --upload-port COM5   # motor_test
 6. Test manual jog.
 7. Test one short auto program with bend/retract cycle.
 
-## 12. Recommended Demo Flow (for Employers)
-
-When presenting this project, use this order:
+## 11. Demo Walkthrough
 
 1. Show architecture (dual ESP32 roles).
 2. Show Manual mode (jog + go-to position).
@@ -183,19 +169,17 @@ When presenting this project, use this order:
 5. Run Auto cycle and explain state transitions.
 6. Trigger/reset alarm and explain recovery behavior.
 
-This sequence makes your practical engineering value clear very quickly.
-
-## 13. Safety Notes
+## 12. Safety Notes
 
 - Test on reduced speed and safe mechanical clearance first.
-- Verify end-stop and sensor wiring before full-range motion.
+- Verify limit switch wiring and transitions before full-range motion.
 - Keep emergency stop hardware path independent from UI actions.
 
-## 14. Current Status
+## 13. Current Status
 
 Working prototype tested on real hardware, with ongoing iterative improvements for production robustness and operator UX.
 
-## 15. Author
+## 14. Author
 
 Aleksandar Zdravkovic  
 Embedded/automation practical portfolio project focused on CNC manufacturing applications.
